@@ -67,6 +67,7 @@
           <label class="d-inline">內務檢查人 <input type="text" id="dInsp" list="dInspList" placeholder="輸入或選擇" autocomplete="off"></label>
           <datalist id="dInspList"></datalist>
         </div>
+        <div class="d-inspchips" id="dInspChips"></div>
         <div id="dWarn"></div>
         <div id="dItems"></div>
         <p id="dPointsLine" class="note"></p>
@@ -180,6 +181,9 @@
     box.hidden = false;
     $("dDate").value = draft.date;
     $("dInspList").innerHTML = data.inspectors.map(n => `<option value="${esc(n)}"></option>`).join("");
+    // 手機的瀏覽器常常不顯示下拉建議，所以另外列出曾經輸入過的檢查人，點一下就填入
+    const cur = $("dInsp").value.trim();
+    $("dInspChips").innerHTML = data.inspectors.length ? `<span class="note">點選檢查人：</span>` + data.inspectors.map(n => `<button type="button" class="d-pick${n === cur ? " on" : ""}" data-pickinsp="${esc(n)}">${esc(n)}</button>`).join("") : "";
     const mm = memberMap(), cd = cdata(), known = new Set(cd.rooms.map(r => r.room));
     const pItems = draft.items.filter(i => i.scope === "p"), gItems = draft.items.filter(i => i.scope === "g");
     const row = (it, idx) => {
@@ -494,6 +498,7 @@
     root.addEventListener("click", async e => {
       const t = e.target;
       const sb = t.closest("[data-sub]"); if (sb) { showSub(sb.dataset.sub); return; }
+      const pi = t.closest("[data-pickinsp]"); if (pi) { $("dInsp").value = pi.dataset.pickinsp; renderDraft(); return; }
       const f = t.closest("[data-flip]"); if (f && draft) { const it = draft.items[+f.dataset.flip]; it.sign *= -1; renderDraft(); return; }
       if (t.id === "dSaveBtn") return saveDraft(false);
       if (t.id === "dSaveNew") return saveDraft("new");

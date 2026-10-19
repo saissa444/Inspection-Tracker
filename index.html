@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>學生加扣分・獎懲登錄</title>
-<link rel="manifest" href="./manifest.webmanifest?v=20261020b">
+<link rel="manifest" href="./manifest.webmanifest?v=20261020c">
 <meta name="theme-color" content="#234e83">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="加扣分獎懲">
-<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261020b">
+<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261020c">
 <style>
 :root{--ink:#1d2939;--muted:#5b6b82;--line:#dce4ef;--bg:#f3f5f9;--card:#fff;--brand:#234e83;--brand-2:#2b5f9e;--soft:#eef4fc;--err:#ae2530;--ok:#127348;--warn:#8a4b08;--cohort:#234e83;font-family:system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;color:var(--ink);background:var(--bg)}
 *{box-sizing:border-box}
@@ -291,8 +291,12 @@ dialog .actions{position:sticky;bottom:-20px;background:#fff;padding:12px 0;marg
 .file-button input{position:absolute;inset:0;opacity:0;cursor:pointer}
 
 /* ───── 內務分頁 ───── */
-.d-subtabs{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0 0}
-.d-subtabs button{margin:0;min-height:40px;padding:8px 14px;background:#e7edf6;color:var(--brand);font-size:15px}
+.d-subtabs{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:16px 0 0;padding-bottom:2px}
+.d-subtabs::-webkit-scrollbar{display:none}
+.d-subtabs button{margin:0;flex:0 0 auto;white-space:nowrap;min-height:36px;padding:6px 12px;background:#e7edf6;color:var(--brand);font-size:13.5px}
+.d-inspchips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:2px 0 8px}
+.d-pick{margin:0;min-height:34px;padding:4px 12px;font-size:14px;background:#e7edf6;color:var(--brand);border-radius:16px}
+.d-pick.on{background:var(--brand);color:#fff}
 .d-subtabs button[aria-selected="true"]{background:var(--brand);color:#fff}
 .d-row{display:flex;gap:8px 14px;align-items:center;flex-wrap:wrap}
 .d-inline{display:flex;align-items:center;gap:6px;margin:6px 0;font-weight:600}
@@ -610,11 +614,11 @@ button.d-small{min-height:36px;padding:6px 12px;font-size:14px;margin:4px 0}
 })();
 </script>
 <script defer src="./vendor/xlsx.full.min.js?v=0.20.3"></script>
-<script defer src="./js/core.js?v=20261020b"></script>
-<script defer src="./js/store.js?v=20261020b"></script>
-<script defer src="./js/dorm-core.js?v=20261020b"></script>
-<script defer src="./js/dorm.js?v=20261020b"></script>
-<script defer src="./js/app.js?v=20261020b"></script>
+<script defer src="./js/core.js?v=20261020c"></script>
+<script defer src="./js/store.js?v=20261020c"></script>
+<script defer src="./js/dorm-core.js?v=20261020c"></script>
+<script defer src="./js/dorm.js?v=20261020c"></script>
+<script defer src="./js/app.js?v=20261020c"></script>
 <script>if ("serviceWorker" in navigator && location.protocol === "https:") window.addEventListener("load", function () { navigator.serviceWorker.register("./sw.js").catch(function () {}); });</script>
 </body>
 </html>
