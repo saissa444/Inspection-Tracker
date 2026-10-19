@@ -10,7 +10,7 @@
 
   let B = null;                     // app.js 提供的介面
   let data = null;                  // {mapping, autoPoints, inspectors, byCohort:{[cohortId]:{roomsText, rooms, reports:{date:report}}}}
-  let draft = null, pendingOverwrite = false;
+  let draft = null, pendingOverwrite = false;   // pendingOverwrite：同一天已有檢查，等使用者選「另外新增」或「取代」
   let sub = "entry", month = null;
   const q = {from: null, to: null, room: "", person: "", view: "room", sort: {k: "s", dir: 1}};
   let idxCache = {id: null, idx: null}, bound = false;
@@ -28,7 +28,13 @@
     if (idxCache.id !== c.id || idxCache.n !== c.students.length) idxCache = {id: c.id, n: c.students.length, idx: D.studentIndex(c.students)};
     return idxCache.idx;
   }
-  const reportsList = () => { const cd = cdata(); return cd ? Object.values(cd.reports).sort((a, b) => a.date.localeCompare(b.date)) : []; };
+  const reportsList = () => { const cd = cdata(); return cd ? Object.entries(cd.reports).map(([id, r]) => Object.assign(r, {id})).sort((a, b) => a.date.localeCompare(b.date) || String(a.savedAt).localeCompare(String(b.savedAt))) : []; };
+  // 同一天可以有好幾次檢查：第一次的編號就是日期，之後是 日期_2、日期_3…
+  const sameDay = date => reportsList().filter(r => r.date === date);
+  const newId = date => { const cd = cdata(); if (!cd.reports[date]) return date; let n = 2; while (cd.reports[date + "_" + n]) n++; return date + "_" + n; };
+  const srcOf = id => "dorm:" + cohort().id + ":" + id;
+  const hhmm = t => { const d = new Date(t); return isNaN(d) ? "" : String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
+  const nthLabel = r => { const list = sameDay(r.date); return list.length > 1 ? `第 ${list.indexOf(list.find(x => x.id === r.id)) + 1} 次` : ""; };
   const stu = k => index().get(k);
   const who = k => { if (k[0] === "?") return k.slice(1); const s = stu(k); return s ? (s.female || s.team) : k; };
   const nameOf = k => { const s = stu(k); return s ? s.name : ""; };
@@ -215,30 +221,39 @@
     else if (!B.pointsOptions()) line = "⚠ 還沒匯入加扣分範本，這次只會記錄內務統計，不會轉入加扣分。";
     else if (needMap) line = "⚠ 還沒選好轉入加扣分要用的事蹟說明，請到「寢室名單與設定」設定；未設定的部分不會轉入。";
     else if (pv.records.length) line = `儲存後會在「加扣分」分頁新增 ${pv.records.length} 筆紀錄（加分 ${plus}、扣分 ${minus}，每筆 0.2 分）。`;
-    const old = B.countPoints("dorm:" + cohort().id + ":" + draft.date);
-    if (line && old && data.autoPoints) line += `這一天之前轉入、還在加扣分預覽表的 ${old} 筆會先移除再重新新增。`;
     $("dPointsLine").textContent = line;
 
-    const exists = !!cdata().reports[draft.date];
+    const same = sameDay(draft.date);
     let s = `<button type="button" id="dSaveBtn" ${draft.items.length ? "" : "disabled"}>儲存這次檢查</button>`;
-    if (pendingOverwrite) s = `<span>${esc(draft.date)} 已經有一筆紀錄，要用這則取代嗎？</span><button type="button" class="solid-danger" id="dOverwrite">取代</button><button type="button" class="secondary" id="dCancelOverwrite">取消</button>`;
-    else if (exists) s += `<span class="note">這一天已經有紀錄，儲存會取代舊的。</span>`;
+    if (pendingOverwrite) {
+      s = `<div style="width:100%">${esc(draft.date)} 已經有 ${same.length} 次檢查。這是同一天的另一次檢查，還是要更正其中一次？</div>
+        <button type="button" id="dSaveNew">另外新增一次檢查</button>` +
+        same.map((r, i) => { const n = B.countPoints(srcOf(r.id));
+          return `<button type="button" class="danger" data-replace="${esc(r.id)}">取代第 ${i + 1} 次（${esc(r.inspector || "未填檢查人")}${hhmm(r.savedAt) ? "，" + hhmm(r.savedAt) + " 存" : ""}${n ? `，含加扣分 ${n} 筆` : ""}）</button>`; }).join("") +
+        `<button type="button" class="secondary" id="dCancelOverwrite">取消</button>`;
+    } else if (same.length) s += `<span class="note">這一天已經有 ${same.length} 次檢查，儲存時可以選擇另外新增或取代。</span>`;
     $("dSave").innerHTML = s;
   }
 
-  async function saveDraft(force) {
+  // mode：undefined＝第一次按儲存；"new"＝同一天另外新增；其他字串＝要取代的那一次的編號
+  async function saveDraft(mode) {
     if (!draft) return;
     const cd = cdata(), c = cohort();
-    if (!force && cd.reports[draft.date]) { pendingOverwrite = true; renderDraft(); return; }
+    if (!mode && sameDay(draft.date).length) { pendingOverwrite = true; renderDraft(); return; }
+    let id = mode && mode !== "new" ? mode : newId(draft.date);
+    if (cd.reports[id] && cd.reports[id].date !== draft.date) { delete cd.reports[id]; id = newId(draft.date); }
     const insp = $("dInsp").value.trim();
     if (insp && !data.inspectors.includes(insp)) { data.inspectors.push(insp); data.inspectors.sort((a, b) => a.localeCompare(b, "zh-Hant")); }
-    const report = {date: draft.date, inspector: insp, raw: draft.raw, savedAt: new Date().toISOString(),
+    // 取代時保留原本的存檔時間，同一天的第幾次才不會跑掉
+    const keepTime = cd.reports[id] && cd.reports[id].savedAt;
+    const report = {date: draft.date, inspector: insp, raw: draft.raw, savedAt: keepTime || new Date().toISOString(), updatedAt: new Date().toISOString(),
       items: draft.items.map(({scope, item, sign, targets, notes}) => ({scope, item, sign, targets: targets.filter(t => t[0] !== "?"), notes: notes || {}}))};
-    cd.reports[draft.date] = report;
+    cd.reports[id] = report;
     let note = "";
     if (data.autoPoints && B.pointsOptions()) {
       const pv = D.pointsFromReport(report, c, data.mapping, stu);
-      const removed = B.replacePoints("dorm:" + c.id + ":" + report.date, pv.records);
+      pv.records.forEach(r => { r.src = srcOf(id); });
+      const removed = B.replacePoints(srcOf(id), pv.records);
       note = pv.records.length ? `，並在「加扣分」新增 ${pv.records.length} 筆紀錄` + (removed ? `（取代原本 ${removed} 筆）` : "") : "";
       if (pv.skipped.length) note += `；${pv.skipped.length} 筆因事蹟說明未設定或查無此人沒有轉入`;
     }
@@ -246,7 +261,8 @@
     month = report.date.slice(0, 7);
     $("dRaw").value = ""; $("dInsp").value = ""; draft = null; pendingOverwrite = false;
     renderDraft();
-    msg("dEntryMsg", `已儲存 ${report.date} 的內務檢查${note}。`, "ok");
+    const nth = sameDay(report.date).length;
+    msg("dEntryMsg", `已儲存 ${report.date} ${nth > 1 ? ` 第 ${sameDay(report.date).findIndex(r => r.id === id) + 1} 次` : ""}內務檢查${note}。`, "ok");
   }
 
   /* ═════ 月統計 ═════ */
@@ -408,10 +424,10 @@
   function renderHistory() {
     const list = reportsList().reverse(), c = cohort();
     $("dHistory").innerHTML = list.length ? list.map(r => {
-      const n = (r.items || []).reduce((s, i) => s + i.targets.length, 0), inPts = B.countPoints("dorm:" + c.id + ":" + r.date);
-      return `<div class="d-rep"><div class="d-row" style="justify-content:space-between"><div><b>${esc(r.date)}</b> <span class="note">${n} 筆優缺點${inPts ? `・加扣分預覽表 ${inPts} 筆` : ""}</span></div>
-        <div class="d-row"><label class="d-inline note">檢查人 <input type="text" list="dInspList" data-insp="${esc(r.date)}" value="${esc(r.inspector || "")}" placeholder="未填"></label>
-        <button type="button" class="danger d-small" data-del="${esc(r.date)}">刪除</button></div></div>
+      const n = (r.items || []).reduce((s, i) => s + i.targets.length, 0), inPts = B.countPoints(srcOf(r.id));
+      return `<div class="d-rep"><div class="d-row" style="justify-content:space-between"><div><b>${esc(r.date)}</b> ${nthLabel(r) ? `<b>${nthLabel(r)}</b>` : ""} <span class="note">${n} 筆優缺點${inPts ? `・加扣分預覽表 ${inPts} 筆` : ""}</span></div>
+        <div class="d-row"><label class="d-inline note">檢查人 <input type="text" list="dInspList" data-insp="${esc(r.id)}" value="${esc(r.inspector || "")}" placeholder="未填"></label>
+        <button type="button" class="danger d-small" data-del="${esc(r.id)}">刪除</button></div></div>
         <details><summary class="note">原始公告</summary><pre class="d-raw">${esc(r.raw || "")}</pre></details></div>`;
     }).join("") : `<p class="note">還沒有紀錄。</p>`;
     $("dInspList").innerHTML = data.inspectors.map(n => `<option value="${esc(n)}"></option>`).join("");
@@ -423,7 +439,7 @@
     const toNum = k => { const s = stu(k); return s ? (s.female || s.team) : k; };
     const out = {app: "內務統計", version: 1, cohort: c.label, exportedAt: new Date().toISOString(),
       rooms: cd.rooms.map(r => ({room: r.room, members: r.members.map(toNum)})),
-      reports: Object.values(cd.reports).map(r => Object.assign({}, r, {items: r.items.map(it => Object.assign({}, it, {
+      reports: Object.entries(cd.reports).map(([id, r]) => Object.assign({}, r, {id, items: r.items.map(it => Object.assign({}, it, {
         targets: it.scope === "p" ? it.targets.map(toNum) : it.targets,
         notes: Object.fromEntries(Object.entries(it.notes || {}).map(([k, v]) => [it.scope === "p" ? toNum(k) : k, v]))}))})),
       inspectors: data.inspectors};
@@ -446,8 +462,9 @@
           if (it.scope !== "p") Object.assign(notes, it.notes || {});
           return {scope: it.scope, item: it.item, sign: it.sign, targets, notes};
         });
-        if (cd.reports[r.date]) replaced++; else added++;
-        cd.reports[r.date] = {date: r.date, inspector: r.inspector || "", raw: r.raw || "", savedAt: r.savedAt || new Date().toISOString(), items};
+        const key = r.id || r.date;
+        if (cd.reports[key]) replaced++; else added++;
+        cd.reports[key] = {date: r.date, inspector: r.inspector || "", raw: r.raw || "", savedAt: r.savedAt || new Date().toISOString(), items};
       }
       if (Array.isArray(d.rooms) && d.rooms.length) {
         cd.roomsText = d.rooms.map(r => r.room + " " + r.members.join(" ")).join("\n");
@@ -468,7 +485,8 @@
       const sb = t.closest("[data-sub]"); if (sb) { showSub(sb.dataset.sub); return; }
       const f = t.closest("[data-flip]"); if (f && draft) { const it = draft.items[+f.dataset.flip]; it.sign *= -1; renderDraft(); return; }
       if (t.id === "dSaveBtn") return saveDraft(false);
-      if (t.id === "dOverwrite") return saveDraft(true);
+      if (t.id === "dSaveNew") return saveDraft("new");
+      const rp = t.closest("[data-replace]"); if (rp) return saveDraft(rp.dataset.replace);
       if (t.id === "dCancelOverwrite") { pendingOverwrite = false; renderDraft(); return; }
       if (t.id === "dCopy") {
         const txt = monthText();
@@ -497,9 +515,11 @@
       if (t.id === "dExport") return exportBackup();
       const del = t.closest("[data-del]");
       if (del) {
-        const date = del.dataset.del, src = "dorm:" + cohort().id + ":" + date, n = B.countPoints(src);
-        if (!confirm(`確定刪除 ${date} 的內務檢查？` + (n ? `\n加扣分預覽表裡這次轉入的 ${n} 筆也會一起移除。` : ""))) return;
-        delete cdata().reports[date];
+        const id = del.dataset.del, r = cdata().reports[id], src = srcOf(id), n = B.countPoints(src);
+        if (!r) return;
+        const label = r.date + (nthLabel(Object.assign(r, {id})) ? " " + nthLabel(r) : "");
+        if (!confirm(`確定刪除 ${label} 的內務檢查？` + (n ? `\n加扣分預覽表裡這次轉入的 ${n} 筆也會一起移除。` : ""))) return;
+        delete cdata().reports[id];
         if (n) B.replacePoints(src, []);
         await flush(); renderHistory();
       }
