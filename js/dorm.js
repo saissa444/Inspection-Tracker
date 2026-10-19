@@ -49,7 +49,7 @@
   function skeleton() {
     $("tab-dorm").innerHTML = `
     <nav class="d-subtabs" role="tablist" aria-label="內務功能">
-      <button type="button" data-sub="entry">登錄公告</button><button type="button" data-sub="stats">月統計</button><button type="button" data-sub="query">明細查詢</button><button type="button" data-sub="rooms">寢室名單與設定</button><button type="button" data-sub="history">檢查紀錄</button>
+      <button type="button" data-sub="entry">登錄公告</button><button type="button" data-sub="stats">月統計</button><button type="button" data-sub="query">明細查詢</button><button type="button" data-sub="history">檢查紀錄</button><button type="button" data-sub="rooms">寢室名單與設定</button>
     </nav>
     <div id="dNoCohort" class="status warning" hidden>請先到「名冊與設定」匯入名冊並選擇目前期別。</div>
 
