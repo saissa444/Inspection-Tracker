@@ -557,17 +557,15 @@
         rows: personRows(E).map(r => { const s = stu(r.k) || {}; return [s.female || "", s.team || "", r.name, r.room ? RL(r.room) : "", r.plus, r.minus, num(r.s)]; }),
         file: "個人總覽_" + q.from + "_" + q.to};
     }
-    // 檢查紀錄：每一筆優缺點一列
-    const list = reportsList(), rows = [];
-    list.forEach(r => {
-      const nth = nthLabel(r);
-      (r.items || []).forEach(it => it.targets.forEach(t => {
-        const p = it.scope === "p", s = p ? stu(t) : null;
-        rows.push([r.date, nth, r.inspector || "", p ? "個人" : "公區", it.item, p ? (s ? s.female || s.team : t) : RL(t), p ? (s ? s.name : "") : "", (it.notes || {})[t] || "", num(D.pts({scope: it.scope, sign: it.sign}))]);
-      }));
-    });
-    return {title: "內務檢查紀錄", subtitle: c.label + "・共 " + list.length + " 次檢查" + (list.length ? "・" + list[0].date + " 至 " + list[list.length - 1].date : ""), summary: [], sheet: "檢查紀錄", numFrom: 8,
-      columns: ["日期", "第幾次", "檢查人", "類別", "項目", "隊號／寢室", "姓名", "註記", "分數"], rows, file: "內務檢查紀錄_" + stamp};
+    // 檢查紀錄：跟畫面一樣，一次檢查一列（新的在上），附原始公告
+    const list = reportsList().reverse();
+    const cards = list.map(r => ({date: r.date, nth: nthLabel(r) || "", inspector: r.inspector || "",
+      n: (r.items || []).reduce((s, i) => s + i.targets.length, 0), pts: B.countPoints(srcOf(r.id)), raw: r.raw || ""}));
+    const dates = list.map(r => r.date).sort();
+    return {title: "已登錄的檢查", subtitle: c.label + "・共 " + list.length + " 次檢查" + (dates.length ? "・" + dates[0] + " 至 " + dates[dates.length - 1] : ""), summary: [], sheet: "檢查紀錄", numFrom: 99,
+      columns: ["日期", "第幾次", "檢查人", "優缺點筆數", "加扣分預覽表筆數", "原始公告"],
+      rows: cards.flatMap(x => (x.raw.trim() ? x.raw.trim().split(/\r?\n/) : [""]).map((l, i) => i ? ["", "", "", "", "", l] : [x.date, x.nth, x.inspector || "未填", x.n, x.pts, l])),
+      groups: cards.map(x => x.raw.trim() ? x.raw.trim().split(/\r?\n/).length : 1), cards, wrapCol: 5, file: "內務檢查紀錄_" + stamp};
   }
   function exportReport(kind, fmtType) {
     if (!cohort()) return;
@@ -583,6 +581,15 @@
         if (typeof v !== "number" || ci < rep.numFrom || !/分$|^室員合計$|^公區$/.test(rep.columns[ci])) return;
         const cell = ws[XL.utils.encode_cell({r: ri + aoa.length - rep.rows.length, c: ci})]; if (cell) cell.z = "+0.0;-0.0;0.0";
       }));
+      if (rep.groups) {   // 一次檢查佔數列：原始公告一行一列，前面欄位合併
+        ws["!cols"][rep.wrapCol] = {wch: Math.min(80, Math.max(30, ...rep.rows.map(r => String(r[rep.wrapCol]).length * 2)))};
+        ws["!merges"] = [];
+        let r0 = aoa.length - rep.rows.length;
+        rep.groups.forEach(g => {
+          if (g > 1) for (let ci = 0; ci < rep.wrapCol; ci++) ws["!merges"].push({s: {r: r0, c: ci}, e: {r: r0 + g - 1, c: ci}});
+          r0 += g;
+        });
+      }
       const wb = XL.utils.book_new(); XL.utils.book_append_sheet(wb, ws, rep.sheet);
       B.download(new Uint8Array(XL.write(wb, {type: "array", bookType: "xlsx"})), rep.file + ".xlsx");
       return;
@@ -593,10 +600,13 @@
     const isScore = i => i >= rep.numFrom && /分$|^室員合計$|^公區$/.test(rep.columns[i]);
     const cell = (v, i) => typeof v === "number" ? (isScore(i) ? (v > 0 ? "+" : "") + v.toFixed(1) : String(v)) : esc(v);
     el.innerHTML = `<h1>${esc(rep.title)}</h1><p class="sub">${esc(rep.subtitle)}・列印日期 ${D.todayStr()}</p>` +
-      rep.summary.map(x => `<p>${esc(x)}</p>`).join("") +
+      rep.summary.map(x => `<p>${esc(x)}</p>`).join("") + (rep.cards ? (rep.cards.map(x =>
+        `<div class="pr-rep"><div class="pr-head"><div><b class="pr-date">${esc(x.date)}</b>${x.nth ? ` <b>${esc(x.nth)}</b>` : ""} <span class="pr-note">${x.n} 筆優缺點${x.pts ? `・加扣分預覽表 ${x.pts} 筆` : ""}</span></div>` +
+        `<div class="pr-insp">檢查人　<span class="${x.inspector ? "" : "pr-empty"}">${esc(x.inspector || "未填")}</span></div></div>` +
+        `<div class="pr-note">原始公告</div><pre class="pr-raw">${esc(x.raw)}</pre></div>`).join("") || "<p>還沒有紀錄。</p>") :
       `<table><thead><tr>${rep.columns.map((col, i) => `<th class="${i >= rep.numFrom ? "r" : ""}">${esc(col)}</th>`).join("")}</tr></thead><tbody>` +
       (rep.rows.map(r => `<tr>${r.map((v, i) => `<td class="${i >= rep.numFrom ? "r" : ""}">${cell(v, i)}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${rep.columns.length}">沒有資料</td></tr>`) +
-      `</tbody></table>`;
+      `</tbody></table>`);
     document.body.classList.add("d-printing");
     const done = () => { document.body.classList.remove("d-printing"); window.removeEventListener("afterprint", done); };
     window.addEventListener("afterprint", done);
