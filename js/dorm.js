@@ -58,6 +58,7 @@
         <h2>貼上內務公告</h2>
         <div class="input-cohort">對象：<span class="cohort-tag active-cohort-tag"></span>（用這一期的名冊辨識女生隊號、建制隊號）</div>
         <textarea id="dRaw" style="min-height:180px" placeholder="把 LINE 上的內務檢查公告整則貼上，例如：&#10;1151019內務檢查&#10;被優：002 003&#10;棉被不潔 088 444194&#10;公物&#10;窗溝不潔 育五7、6-2"></textarea>
+        <div id="dQuickSlot"></div>
         <p class="note">「公物」那一行以下算公區（寫寢室號），以上算個人（寫女生隊號或建制隊號）。項目名稱有「優、整潔、整齊、乾淨」算加分，其他算扣分，點分數標籤可以改。</p>
       </section>
       <section id="dPreview" hidden>

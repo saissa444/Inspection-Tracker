@@ -452,6 +452,7 @@
       $("tabBtn-" + name).setAttribute("aria-selected", String(name === tab));
     });
     if (settings.tab !== tab) { settings.tab = tab; saveSettings(); }
+    placeQuickPanel(tab);
     updateSelBar();
   }
   document.querySelectorAll(".tab").forEach(button => button.addEventListener("click", () => showTab(button.dataset.tab)));
@@ -1120,18 +1121,33 @@
     else { btn.textContent = "無法複製"; btn.classList.remove("done"); }
     copyTimer = setTimeout(() => { btn.textContent = "複製"; btn.classList.remove("done"); }, 1800);
   });
-  let pIdsCaret = null;
-  ["focus", "click", "keyup", "input", "select"].forEach(type => $("pIds").addEventListener(type, () => {
-    pIdsCaret = {start: $("pIds").selectionStart, end: $("pIds").selectionEnd};
-  }));
+  // 常用狀況面板在「加扣分」和「內務」兩個分頁共用：切換分頁時把面板搬過去，點選的字詞填進該分頁的輸入框
+  let quickTarget = "pIds";
+  const quickCarets = {};
+  ["focus", "click", "keyup", "input", "select"].forEach(type => document.addEventListener(type, event => {
+    const el = event.target;
+    if (el && (el.id === "pIds" || el.id === "dRaw")) quickCarets[el.id] = {start: el.selectionStart, end: el.selectionEnd};
+  }, true));
+  function placeQuickPanel(tab) {
+    const panel = $("pQuick"), slot = $("dQuickSlot");
+    if (tab === "dorm" && slot) { if (panel.parentNode !== slot) slot.append(panel); quickTarget = "dRaw"; }
+    else if (tab === "points") { if (panel.nextElementSibling !== $("pCheck")) $("pCheck").before(panel); quickTarget = "pIds"; }
+    $("pQuickHint").textContent = "";
+  }
   function insertQuickPhrase(text, autoReason) {
-    const box = $("pIds"), value = box.value;
-    const start = pIdsCaret ? Math.min(pIdsCaret.start, value.length) : value.length;
-    const end = pIdsCaret ? Math.min(pIdsCaret.end, value.length) : value.length;
+    const box = $(quickTarget), value = box.value, mark = quickCarets[quickTarget];
+    const start = mark ? Math.min(mark.start, value.length) : value.length;
+    const end = mark ? Math.min(mark.end, value.length) : value.length;
     let before = value.slice(0, start), after = value.slice(end);
     const trimmed = before.replace(/[ \t\u3000]+$/, "");
     const lastToken = trimmed.split(/[\s、,，]+/).pop();
-    if (trimmed && ALL_PHRASES.has(lastToken)) before = trimmed + "、"; // 緊接在另一個常用狀況後：用「、」合併成同一個註記
+    if (quickTarget === "dRaw") {
+      // 內務公告：一個項目一行；寢室號（育五3）接在同一行後面
+      const isRoom = window.DormCore && window.DormCore.normRoom(text);
+      if (isRoom) { if (before && !/\s$/.test(before)) before += /育[一二三四五六七八九十\d]+$/.test(trimmed) ? "、" : " "; }
+      else if (trimmed && !/\n$/.test(before)) before = trimmed + "\n";
+    }
+    else if (trimmed && ALL_PHRASES.has(lastToken)) before = trimmed + "、"; // 緊接在另一個常用狀況後：用「、」合併成同一個註記
     else if (before && !/\s$/.test(before)) before += " ";              // 前面是學號或其他文字：補空格
     const insert = text + (/^[ \t\u3000]/.test(after) ? "" : " ");
     box.value = before + insert + after;
@@ -1139,8 +1155,8 @@
     box.dispatchEvent(new Event("input", {bubbles: true}));
     box.focus();
     box.setSelectionRange(caret, caret);
-    pIdsCaret = {start: caret, end: caret};
-    if (autoReason !== false) autoQuickReason();
+    quickCarets[quickTarget] = {start: caret, end: caret};
+    if (autoReason !== false && quickTarget === "pIds") autoQuickReason();
   }
   // 這一批還沒動過事由時，自動帶入「扣分｜63.內務不整者」；已手動選過就只提醒、不覆蓋
   function autoQuickReason() {
