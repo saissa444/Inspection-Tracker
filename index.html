@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>學生加扣分・獎懲登錄</title>
+<link rel="manifest" href="./manifest.webmanifest?v=20261019q">
+<meta name="theme-color" content="#234e83">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="加扣分獎懲">
+<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261019q">
+<style>
+:root{--ink:#1d2939;--muted:#5b6b82;--line:#dce4ef;--bg:#f3f5f9;--card:#fff;--brand:#234e83;--brand-2:#2b5f9e;--soft:#eef4fc;--err:#ae2530;--ok:#127348;--warn:#8a4b08;--cohort:#234e83;font-family:system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;color:var(--ink);background:var(--bg)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg)}
+[hidden]{display:none!important}
+main{max-width:1240px;margin:0 auto;padding:4px 14px 40px}
+section{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin:16px 0}
+h1{font-size:22px;margin:0}
+h2{font-size:18px;margin:0 0 12px}
+.h2-row{display:flex;align-items:center;gap:8px 18px;flex-wrap:wrap;margin:0 0 12px}
+.h2-row h2{margin:0}
+.batch-clear{display:flex;align-items:center;gap:10px}
+.batch-clear button{margin:0;min-height:36px;padding:6px 14px;font-size:14px}
+.prev-note{font-size:12.5px;color:#b42318;white-space:nowrap}
+.prev-note.now{color:var(--muted)}
+h3{font-size:16px;margin:0 0 8px}
+label{display:block;font-weight:650;margin:13px 0 6px}
+input,select,textarea,button{font:inherit}
+input,select,textarea{width:100%;padding:11px 12px;border:1px solid #c5d0de;border-radius:9px;font-size:16px;background:#fff;color:var(--ink)}
+textarea{min-height:90px;resize:vertical}
+select{text-overflow:ellipsis}
+button,.button{display:inline-block;min-height:44px;padding:10px 18px;border:0;border-radius:10px;background:var(--brand);color:#fff;font-weight:650;cursor:pointer;margin:8px 8px 4px 0;text-decoration:none}
+button.secondary{background:#e7edf6;color:var(--brand)}
+button.danger{background:#fff0ee;color:#b42318;border:1px solid #f3c4bd}
+button.solid-danger{background:var(--err);color:#fff}
+button:disabled{opacity:.45;cursor:not-allowed}
+input[type="checkbox"]{width:22px;height:22px;padding:0;vertical-align:middle;accent-color:var(--brand);flex-shrink:0}
+.muted,.note{color:var(--muted);font-size:13.5px;line-height:1.7}
+.err{color:var(--err);white-space:pre-wrap}
+.ok{color:var(--ok)}
+.status{background:#eef5ff;border-radius:9px;padding:11px 13px;margin-top:12px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6}
+.status.ok{background:#ebf8f1;color:var(--ok)}
+.status.error{background:#fff1f0;color:var(--err)}
+.status.warning{background:#fff7e6;color:var(--warn)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:640px){.grid{grid-template-columns:1fr}section{padding:15px}}
+.actions{display:flex;gap:4px 8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+
+/* 鎖定畫面 */
+#lockScreen{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:20px}
+.lock-card{width:min(440px,100%);margin:0}
+.lock-card h1{font-size:22px;margin-bottom:6px}
+.lock-badge{display:inline-flex;align-items:center;gap:6px;background:var(--soft);color:var(--brand);border-radius:999px;padding:4px 12px;font-size:13px;font-weight:650;margin-bottom:12px}
+
+/* 頁首與期別列 */
+.topbar{background:var(--brand);color:#fff}
+.topbar-inner{max-width:1240px;margin:0 auto;padding:12px 14px;display:flex;align-items:center;gap:12px}
+.topbar h1{flex:1;font-size:19px}
+.topbar small{display:block;font-weight:400;opacity:.8;font-size:12.5px;margin-top:2px}
+.topbar button{background:rgba(255,255,255,.16);margin:0;min-height:40px;padding:8px 14px}
+.cohort-bar{position:sticky;top:0;z-index:20;background:#fff;border-bottom:3px solid var(--cohort);box-shadow:0 2px 10px rgba(16,33,61,.06)}
+.cohort-inner{max-width:1240px;margin:0 auto;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cohort-label{font-weight:700;font-size:14px;color:var(--muted)}
+.cohort-buttons{display:flex;gap:8px;flex-wrap:wrap}
+.cohort-btn{margin:0;min-height:42px;padding:8px 16px;border-radius:999px;background:#fff;color:var(--c);border:2px solid var(--c);font-weight:700}
+.cohort-btn[aria-checked="true"]{background:var(--c);color:#fff;box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 25%,transparent)}
+.cohort-btn small{font-weight:500;opacity:.85;margin-left:4px}
+.cohort-empty{color:var(--err);font-weight:650}
+.tabs{max-width:1240px;margin:12px auto 0;padding:0 14px;display:flex;gap:6px;overflow-x:auto}
+.tab{margin:0;background:#e3e9f2;color:var(--brand);border-radius:10px 10px 0 0;min-height:44px;white-space:nowrap}
+.tab[aria-selected="true"]{background:var(--card);color:var(--ink);box-shadow:inset 0 3px 0 var(--brand)}
+.tab .count{display:inline-block;min-width:22px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--brand);color:#fff;font-size:12px;line-height:20px}
+.tab .count:empty{display:none}
+.tabpanel>section:first-child{margin-top:0;border-top-left-radius:0}
+.cohort-tag{display:inline-block;padding:2px 9px;border-radius:999px;color:#fff;background:var(--c,#64748b);font-size:12.5px;font-weight:650;white-space:nowrap}
+.input-cohort{display:flex;align-items:center;gap:8px;margin:2px 0 8px;font-size:14px;color:var(--muted)}
+
+/* 學生辨識 */
+.check-panel{margin-top:12px;padding:12px 14px;background:#f8fafc;border:1px solid var(--line);border-radius:10px;line-height:1.75;font-size:14.5px}
+.student-row{padding:7px 0;border-bottom:1px solid var(--line);white-space:pre-wrap;overflow-wrap:anywhere}
+.student-row:last-of-type{border-bottom:0}
+.student-row.error{color:var(--err)}
+
+/* 加扣分：常用與瀏覽 */
+.reason-browser{margin:12px 0;border:1px solid #c7d9f0;border-radius:12px;padding:12px;background:#f7faff}
+.reason-browser summary{cursor:pointer;font-weight:650;padding:8px 0}
+.reason-results{max-height:360px;overflow-y:auto;overscroll-behavior:contain}
+.reason-results h3{font-size:15px;margin:16px 0 6px}
+.reason-choice{display:block;width:100%;margin:6px 0;text-align:left;background:#fff;color:var(--brand);border:1px solid #c7d9f0;font-size:16px;line-height:1.5;overflow-wrap:anywhere;font-weight:600}
+.reason-choice[aria-pressed="true"]{background:#e0edff;border:2px solid var(--brand)}
+.reason-choice small{display:block;font-weight:400;color:var(--muted)}
+.reason-choice:focus-visible,summary:focus-visible,button:focus-visible{outline:3px solid #d58b00;outline-offset:2px}
+.reason-favorites{margin:10px 0 16px;padding:12px;background:#fff8e8;border:1px solid #ead5a4;border-radius:10px}
+
+/* 表格 */
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:9px;border-bottom:1px solid #e7eaf0;text-align:left;vertical-align:top}
+th{background:#eef3f9;white-space:nowrap;position:sticky;top:0}
+td.wrap{min-width:200px;max-width:380px;white-space:pre-wrap;overflow-wrap:anywhere}
+td.nowrap{white-space:nowrap}
+tr.selected-record,tr.just-edited{background:var(--soft)}
+td button{margin:2px 4px 2px 0;min-height:38px;padding:6px 12px}
+.bulk-tools{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;margin:10px 0}
+.bulk-hint{font-size:12.5px}
+.bulk-hint.active{color:var(--brand);font-weight:650}
+/* 勾選時的懸浮提示列 */
+#selBar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));z-index:31;display:flex;align-items:center;gap:12px;flex-wrap:nowrap;white-space:nowrap;max-width:calc(100vw - 80px);background:#1f3b63;color:#fff;border-radius:14px;padding:8px 10px;box-shadow:0 6px 20px rgba(16,33,61,.35);font-size:14px;line-height:1.4}
+#selBar strong{font-size:15px}
+#selBar .sel-text{overflow:hidden;text-overflow:ellipsis;min-width:0}
+#selBar[hidden]{display:none!important}
+#selBar.anchored{position:absolute;bottom:auto;right:auto;transform:none;box-shadow:0 6px 18px rgba(16,33,61,.32)}
+@media (max-width:1023px){
+  #selBar{left:12px;transform:none;max-width:calc(100vw - 84px)}
+}
+@media (max-width:520px){
+  #selBar .sel-help{display:none}
+}
+#selBar button{margin:0;min-height:36px;padding:4px 12px;background:rgba(255,255,255,.18);font-size:13.5px;flex:0 0 auto}
+#selBar #selBarEdit{background:#fff;color:var(--brand)}
+#selBar #selBarDelete{background:#c0392b;color:#fff}
+@media (max-width:520px){
+  #selBar{gap:8px;padding:7px 8px}
+  #selBar button{padding:4px 10px}
+  #selBar strong{font-size:14px}
+}
+.check-label{display:inline-flex;align-items:center;gap:8px;min-height:44px;margin:0;font-weight:500}
+.editbox{background:var(--soft);border:1px solid #c7d9f0;border-radius:12px;padding:16px;margin:12px 0}
+.edit-field-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.edit-field-heading .bulk-toggle{white-space:nowrap;font-size:14px;font-weight:400;margin:13px 0 6px}
+.summary-line{font-weight:650}
+
+/* 手機：預覽表改為卡片，每個欄位都看得到 */
+@media (max-width:1023px){
+  .tablewrap{border:0;overflow:visible}
+  .tablewrap table,.tablewrap tbody{display:block}
+  .tablewrap thead{display:none}
+  .tablewrap tr{display:flex;flex-wrap:wrap;align-items:center;border:1px solid var(--line);border-radius:12px;margin:10px 0;padding:8px 12px 10px;background:#fff;box-shadow:0 1px 3px rgba(16,33,61,.05)}
+  .tablewrap tr.selected-record,.tablewrap tr.just-edited{background:var(--soft);border-color:#9db6d6}
+  .tablewrap td{display:block;flex:1 1 100%;border:0;padding:3px 0;max-width:none;min-width:0;white-space:normal;overflow-wrap:anywhere}
+  .tablewrap td[data-label]{display:grid;grid-template-columns:96px 1fr;gap:8px}
+  .tablewrap td[data-label]::before{content:attr(data-label);color:var(--muted);font-size:13px;font-weight:400;line-height:1.9}
+  .tablewrap td[data-label]:empty{display:none}
+  .tablewrap td.wrap{white-space:pre-wrap}
+  .tablewrap td.cell-select{flex:0 0 auto;padding-right:10px}
+  .tablewrap td.cell-cohort{flex:1 1 auto}
+  .tablewrap td.cell-name{font-weight:700;font-size:16px}
+  .tablewrap td.cell-actions{order:99;display:flex;gap:8px;margin-top:6px;padding-top:8px;border-top:1px solid var(--line)}
+  .tablewrap td.cell-actions button{flex:1;margin:0;min-height:42px}
+  .tablewrap tr#pInlineEditRow{padding:0;border:0;box-shadow:none;background:transparent}
+  .check-label{min-height:36px}
+}
+
+/* 預覽清單工具：精簡／完整、分組、篩選、回到頂端 */
+.list-tools{margin:8px 0}
+.view-seg{display:none;border:1px solid #c5d0de;border-radius:10px;overflow:hidden;margin:4px 0 8px}
+.view-seg button{margin:0;border-radius:0;background:#fff;color:var(--brand);min-height:38px;padding:6px 18px}
+.view-seg button[aria-pressed="true"]{background:var(--brand);color:#fff}
+.groups-box{border:1px solid var(--line);border-radius:12px;padding:4px 12px;margin:8px 0;background:#fafcff}
+.groups-box summary{cursor:pointer;font-weight:650;padding:8px 0}
+.groups{display:flex;flex-direction:column;gap:6px;padding-bottom:10px}
+.group-item{display:block;width:100%;margin:0;text-align:left;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-weight:400;min-height:0}
+.group-item[aria-pressed="true"]{border:2px solid var(--brand);background:var(--soft)}
+.group-item .g-head{display:flex;justify-content:space-between;gap:10px;font-weight:650;line-height:1.5}
+.group-item .g-count{white-space:nowrap;color:var(--brand)}
+.group-item .g-names{color:var(--muted);font-size:13px;margin-top:2px;line-height:1.55}
+.filter-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px}
+.filter-bar select{width:auto;min-width:118px;flex:0 0 auto}
+.filter-bar input{flex:1 1 170px;width:auto}
+.filter-bar button{margin:0}
+td.cell-summary{display:none}
+#toTop{position:fixed;right:max(10px,calc((100vw - 1240px) / 2 - 58px));bottom:calc(14px + env(safe-area-inset-bottom));z-index:30;width:44px;height:44px;min-height:0;padding:0;border-radius:50%;margin:0;font-size:20px;line-height:44px;text-align:center;opacity:.88;box-shadow:0 4px 14px rgba(16,33,61,.28)}
+@media (max-width:1023px){
+  .view-seg{display:inline-flex}
+  .tablewrap.compact td.cell-summary{display:block;flex:1 1 0;min-width:0;cursor:pointer;padding:2px 0}
+  .tablewrap.compact td.cell-cohort{display:none}
+  .tablewrap.compact tr:not(.expanded):not(#pInlineEditRow)>td:not(.cell-select):not(.cell-summary){display:none}
+  .tablewrap.compact tr{margin:6px 0;padding:7px 10px}
+  .tablewrap.compact tr.expanded td.cell-summary{padding-bottom:8px;margin-bottom:4px;border-bottom:1px dashed var(--line)}
+  .tablewrap.compact td.cell-select{padding-right:8px}
+  .sum-line1{display:flex;align-items:center;gap:6px;min-width:0}
+  .sum-line1 .cohort-tag{font-size:11.5px;padding:1px 7px}
+  .sum-who{font-weight:700;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+  .sum-amt{font-weight:700;white-space:nowrap;font-size:14px}
+  .sum-amt.minus{color:var(--err)}
+  .sum-amt.plus{color:var(--ok)}
+  .sum-chev{color:var(--muted);display:inline-block;transition:transform .15s;font-size:18px;line-height:1;width:12px;text-align:center}
+  tr.expanded .sum-chev{transform:rotate(90deg)}
+  .sum-line2{display:grid;grid-template-columns:auto minmax(0,1fr);color:var(--muted);font-size:13px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:2px}
+  .sum-label{color:#8593a8;font-size:12px}
+}
+/* 電腦／平板：「勾選」「操作」固定在最左側，編輯與刪除左右並排 */
+@media (min-width:1024px){
+  /* 欄距與按鈕縮小、標題可換行，讓整張表在畫面內顯示，不必左右滑動 */
+  .tablewrap.records table{font-size:13.5px}
+  .tablewrap.records th,.tablewrap.records td{padding:8px 6px}
+  .tablewrap.records th{white-space:normal;line-height:1.35;vertical-align:bottom}
+  .tablewrap.records td.wrap{min-width:96px;max-width:260px}
+  .tablewrap.records td.cell-actions button{min-height:32px;padding:4px 9px;font-size:13px}
+  .tablewrap.records .cohort-tag{font-size:12px;padding:1px 7px}
+  .tablewrap.records td.cell-select,.tablewrap.records th.col-select{position:sticky;left:0;z-index:1;background:#fff;width:40px;min-width:40px;max-width:40px;text-align:center}
+  .tablewrap.records td.cell-actions,.tablewrap.records th.col-actions{position:sticky;left:40px;z-index:1;background:#fff;white-space:nowrap;box-shadow:8px 0 10px -8px rgba(16,33,61,.22)}
+  .tablewrap.records th.col-actions,.tablewrap.records th.col-select{background:#eef3f9;z-index:2}
+  .tablewrap.records tr.selected-record td.cell-actions,.tablewrap.records tr.selected-record td.cell-select,
+  .tablewrap.records tr.just-edited td.cell-actions,.tablewrap.records tr.just-edited td.cell-select{background:var(--soft)}
+  .tablewrap.records td.cell-select .check-label{min-height:0}
+  .tablewrap.records td.cell-actions button{display:inline-block;width:auto;margin:2px 6px 2px 0}
+  .tablewrap.records td.cell-actions button:last-child{margin-right:0}
+}
+/* 加扣分：預覽列內直接編輯 */
+/* 連續勾選：勾選欄可按住拖曳（手機不會因此捲動頁面） */
+.tablewrap.records td.cell-select{touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer}
+body.range-selecting{user-select:none;-webkit-user-select:none}
+body.range-selecting #selBar,body.range-selecting #toTop{pointer-events:none;opacity:.35}
+tr.inline-editing{background:#fffbea!important;outline:2px solid #d9a400;outline-offset:-2px}
+tr.inline-editing td.cell-actions,tr.inline-editing td.cell-select{background:#fffbea!important}
+tr.edit-target:not(.inline-editing){outline:2px dashed #d9a400;outline-offset:-2px}
+.inline-field{width:100%;min-width:0;max-width:100%;font-size:13.5px;padding:5px 6px;border-radius:7px}
+textarea.inline-field{min-height:58px;resize:vertical}
+td .inline-field + .inline-hint{margin-top:4px}
+.inline-hint{font-size:12px;color:#8a5a00;line-height:1.5}
+.inline-error{font-size:12.5px;color:var(--err);white-space:pre-wrap;margin-top:4px}
+select.inline-kind{min-width:66px}
+select.inline-article{min-width:76px}
+select.inline-clause{min-width:76px}
+select.inline-item{min-width:60px}
+select.inline-adjreason{min-width:78px}
+select.inline-adjamount{min-width:66px}
+.inline-amount{font-weight:650;color:var(--brand)}
+select.inline-score{min-width:60px}
+td[data-label] > .inline-hint,td[data-label] > .inline-error{grid-column:2}
+td.cell-actions button.inline-save{background:#127348}
+/* 常用狀況（只在手機／平板的卡片模式顯示） */
+.quick-phrases{display:none;margin:8px 0 4px}
+@media (max-width:1023px){ .quick-phrases{display:block} }
+.label-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:13px 0 6px}
+.label-row label{margin:0}
+.copy-btn{display:none;padding:4px 14px;min-height:34px;font-size:14px;margin:0;flex:none}
+.copy-btn.done{background:#e6f4ea;color:#1e6b34}
+@media (max-width:1023px){ .copy-btn{display:inline-block} }
+.qp-head{font-size:13px;font-weight:650;color:var(--ink);margin-bottom:6px}
+.qp-head .note{font-weight:400;font-size:12px}
+.qp-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.qp-edit{flex:none;margin:0;min-height:30px;padding:2px 10px;font-size:12.5px;font-weight:650;border-radius:8px;background:transparent;border:1px dashed #9fb8d8;color:var(--brand)}
+.qp-edit.qp-done{background:var(--brand);border-style:solid;color:#fff}
+.qp-cats button.qp-del{background:#fff5f5;border:1px solid #e5b3b3;color:#a32626}
+.qp-items button.qp-tool.qp-danger{background:#a32626;border:1px solid #a32626;color:#fff}
+.qp-cats{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+.qp-cats button{flex:0 0 auto;margin:0;min-height:34px;padding:4px 12px;border-radius:999px;background:#eef3f9;color:var(--brand);font-size:13.5px;font-weight:650}
+.qp-cats button[aria-selected="true"]{background:var(--brand);color:#fff}
+.qp-items{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;padding:8px;background:#f7faff;border:1px solid #d6e2f2;border-radius:10px}
+.qp-items button{margin:0;min-height:34px;padding:4px 10px;border-radius:8px;background:#fff;color:var(--ink);border:1px solid #c7d9f0;font-size:13.5px;font-weight:500}
+.qp-cats button.qp-direct{background:#fff;color:var(--ink);border:1px solid #c7d9f0}
+.qp-cats button.qp-direct.tapped{background:#dff3e8;border-color:#127348;color:#127348}
+.qp-items button.tapped{background:#dff3e8;border-color:#127348;color:#127348}
+.qp-items button.qp-del{background:#fff5f5;border-color:#e5b3b3;color:#a32626}
+.qp-tools{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:2px;padding-top:8px;border-top:1px dashed #d6e2f2}
+.qp-items button.qp-tool{background:transparent;border:1px dashed #9fb8d8;color:var(--brand);font-weight:650}
+.qp-items button.qp-done{background:var(--brand);border-style:solid;color:#fff}
+.qp-msg{font-size:12.5px;color:var(--ok)}
+.qp-msg.warn{color:#a32626}
+.qp-empty{font-size:13px;color:var(--muted);padding:4px 2px}
+.qp-addform{flex-basis:100%;display:flex;gap:6px;align-items:center;margin:0}
+.qp-addform input{flex:1;min-width:0;margin:0;min-height:36px;font-size:16px}
+.qp-addform button{margin:0;min-height:36px;padding:4px 12px;flex:none}
+.qp-items .qp-addform button[type=submit]{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:650}
+.qp-tools:empty{display:none}
+.quick-phrases button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.quick-phrases button.dragging{transform:scale(1.08);box-shadow:0 6px 16px rgba(20,40,80,.28);outline:2px solid var(--brand);position:relative;z-index:2}
+.quick-phrases .reordering button:not(.dragging){opacity:.75}
+.qp-hint{font-size:12.5px;margin:6px 0 0;line-height:1.5;color:var(--ok)}
+.qp-hint.warn{color:#8a5a00}
+.qp-hint:empty{display:none}
+dialog{width:min(620px,calc(100% - 24px));max-height:85vh;max-height:85dvh;border:1px solid #b8c7d9;border-radius:14px;padding:20px;overflow:auto;color:var(--ink)}
+dialog::backdrop{background:#10213d80}
+.edit-group{margin:14px 0;padding:12px;border:1px solid var(--line);border-radius:10px}
+dialog .actions{position:sticky;bottom:-20px;background:#fff;padding:12px 0;margin-bottom:-12px;border-top:1px solid var(--line)}
+
+/* 設定 */
+.cohort-card{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line);border-left:6px solid var(--c);border-radius:10px;margin:10px 0}
+.cohort-card .info{flex:1;min-width:200px;line-height:1.6}
+.cohort-card .info strong{font-size:17px;color:var(--c)}
+.cohort-card button{margin:0}
+.pending{border:2px dashed #9db6d6;border-radius:12px;padding:14px;margin-top:12px;background:#f7faff}
+.tpl-row{padding:12px 0;border-bottom:1px solid var(--line)}
+.tpl-row:last-child{border-bottom:0}
+.file-button{position:relative;overflow:hidden}
+.file-button input{position:absolute;inset:0;opacity:0;cursor:pointer}
+
+/* ───── 內務分頁 ───── */
+.d-subtabs{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0 0}
+.d-subtabs button{margin:0;min-height:40px;padding:8px 14px;background:#e7edf6;color:var(--brand);font-size:15px}
+.d-subtabs button[aria-selected="true"]{background:var(--brand);color:#fff}
+.d-row{display:flex;gap:8px 14px;align-items:center;flex-wrap:wrap}
+.d-inline{display:flex;align-items:center;gap:6px;margin:6px 0;font-weight:600}
+.d-inline input,.d-inline select{width:auto;padding:8px 10px}
+.d-grow{flex:1;min-width:220px}.d-grow input{flex:1;width:100%}
+button.d-small{min-height:36px;padding:6px 12px;font-size:14px;margin:4px 0}
+.d-item{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:start;padding:9px 0;border-top:1px solid var(--line)}
+.d-sign{margin:0;min-height:30px;padding:2px 10px;border-radius:6px;font-size:14px;min-width:62px}
+.d-sign.neg{background:#fff0ee;color:#b42318}.d-sign.pos{background:#ebf8f1;color:var(--ok)}
+.d-iname{font-weight:650}.d-iname small{color:var(--muted);font-weight:400;margin-left:6px}
+.d-chips{grid-column:2;display:flex;flex-wrap:wrap;gap:6px}
+.d-vcard .d-chips{grid-column:auto}
+.d-chip{font-size:14px;background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:2px 8px}
+.d-chip small{color:var(--muted)}
+.d-chip.unk{border-style:dashed;color:var(--warn);background:#fff7e6}
+.d-neg{color:#b42318}.d-pos{color:var(--ok)}
+.d-verdict{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+@media (max-width:640px){.d-verdict{grid-template-columns:1fr}}
+.d-vcard{border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.d-vcard.bad{border-top:4px solid #b42318}.d-vcard.good{border-top:4px solid var(--ok)}
+.d-vlab{font-size:13px;letter-spacing:.1em;color:var(--muted)}
+.d-vroom{font-size:24px;font-weight:700}.d-vroom span{font-size:18px;margin-left:8px}
+.d-tablewrap{overflow-x:auto}
+.d-table{border-collapse:collapse;width:100%;font-size:14.5px}
+.d-table th,.d-table td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.d-table th{color:var(--muted);font-weight:600;font-size:13.5px}
+.d-table .r{text-align:right;font-variant-numeric:tabular-nums}
+.d-table tr.row-bad td{background:#fff0ee}.d-table tr.row-good td{background:#ebf8f1}
+.d-table a{color:var(--brand)}
+.hl-g{background:#dcf3e6!important;color:var(--ok)!important;font-weight:700}
+.hl-b{background:#fde3df!important;color:#b42318!important;font-weight:700}
+.d-legend{padding:1px 6px;border-radius:4px;margin-left:8px}
+.d-sortable{cursor:pointer;user-select:none}
+.d-seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.d-seg button{margin:0;border-radius:0;background:#fff;color:var(--muted);min-height:40px}
+.d-seg button[aria-pressed="true"]{background:var(--brand);color:#fff}
+.d-stat{display:flex;flex-direction:column;gap:2px;margin-right:22px}.d-stat b{font-size:20px;font-variant-numeric:tabular-nums}
+.d-rep{padding:10px 0;border-top:1px solid var(--line)}
+.d-rep input{width:8em;padding:5px 8px;font-size:14px}
+.d-raw{white-space:pre-wrap;font:inherit;font-size:13.5px;background:var(--soft);padding:8px;border-radius:8px}
+.d-map{min-width:0}
+.d-filebtn{margin:8px 8px 4px 0}
+</style>
+</head>
+<body>
+
+<!-- ───────── 鎖定／首次設定 ───────── -->
+<div id="lockScreen">
+  <section class="lock-card">
+    <span class="lock-badge">🔒 資料只存在這台裝置</span>
+    <h1>學生加扣分・獎懲登錄</h1>
+    <div id="bootStatus" class="status" role="status">程式載入中…</div>
+    <noscript><p class="err">請啟用 JavaScript。</p></noscript>
+
+    <form id="setupForm" hidden autocomplete="off">
+      <p class="note">第一次在這台裝置使用，請設定一組<strong>開啟密碼</strong>。之後匯入的名冊與範本都會用這組密碼加密，存在這個瀏覽器裡，不會上傳。每次開啟 App 時輸入密碼即可使用，不必再匯入檔案。</p>
+      <label for="setupPw">開啟密碼（至少 6 個字元）</label>
+      <input id="setupPw" type="password" autocomplete="new-password" minlength="6" required>
+      <label for="setupPw2">再輸入一次</label>
+      <input id="setupPw2" type="password" autocomplete="new-password" minlength="6" required>
+      <p class="note">⚠️ 密碼忘記無法找回，只能清除本機資料後重新匯入名冊。</p>
+      <button type="submit" id="setupBtn">建立並開始使用</button>
+      <p id="setupStatus" class="err" role="alert"></p>
+    </form>
+
+    <form id="unlockForm" hidden autocomplete="off">
+      <label for="unlockPw">開啟密碼</label>
+      <input id="unlockPw" type="password" autocomplete="current-password" required>
+      <button type="submit" id="unlockBtn">解鎖</button>
+      <p id="unlockStatus" class="err" role="alert"></p>
+      <details>
+        <summary class="note">忘記密碼？</summary>
+        <p class="note">密碼無法找回。可以清除這台裝置上本 App 的所有資料（名冊、範本、尚未匯出的紀錄），再重新設定密碼並匯入。</p>
+        <button type="button" id="forgotWipe" class="solid-danger">清除本機全部資料</button>
+      </details>
+    </form>
+  </section>
+</div>
+
+<!-- ───────── 主程式 ───────── -->
+<div id="app" hidden>
+  <header class="topbar"><div class="topbar-inner">
+    <h1>學生加扣分・獎懲登錄<small id="topSubtitle">名冊與範本保存在這台裝置</small></h1>
+    <button id="lockBtn" type="button">🔒 鎖定</button>
+  </div></header>
+
+  <div class="cohort-bar" id="cohortBar"><div class="cohort-inner">
+    <span class="cohort-label">目前期別</span>
+    <div id="cohortButtons" class="cohort-buttons" role="radiogroup" aria-label="目前期別"></div>
+    <span id="cohortEmpty" class="cohort-empty" hidden>尚未匯入名冊，請到「名冊與設定」匯入</span>
+  </div></div>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tabBtn-dorm" aria-controls="tab-dorm" data-tab="dorm">內務</button>
+    <button class="tab" role="tab" id="tabBtn-points" aria-controls="tab-points" data-tab="points">加扣分<span class="count" id="pTabCount"></span></button>
+    <button class="tab" role="tab" id="tabBtn-reward" aria-controls="tab-reward" data-tab="reward">獎懲<span class="count" id="rTabCount"></span></button>
+    <button class="tab" role="tab" id="tabBtn-settings" aria-controls="tab-settings" data-tab="settings">名冊與設定</button>
+  </nav>
+
+  <main>
+  <!-- ═════════ 內務（內容由 js/dorm.js 產生） ═════════ -->
+  <div id="tab-dorm" class="tabpanel" role="tabpanel" aria-labelledby="tabBtn-dorm" hidden></div>
+
+  <!-- ═════════ 加扣分 ═════════ -->
+  <div id="tab-points" class="tabpanel" role="tabpanel" aria-labelledby="tabBtn-points" hidden>
+    <section>
+      <div class="h2-row"><h2>① 批次登錄</h2><div class="batch-clear"><button type="button" id="pBatchClear" class="danger" disabled>清空紀錄</button><span id="pPrevNote" class="prev-note" role="status" aria-live="polite"></span></div></div>
+      <div class="input-cohort">查詢對象：<span class="cohort-tag active-cohort-tag"></span>（只在這一期的名冊中查找）</div>
+      <div class="label-row"><label for="pIds">輸入學生（可多筆）</label><button type="button" id="pCopy" class="copy-btn secondary" aria-label="複製輸入框內容">複製</button></div>
+      <textarea id="pIds" style="min-height:150px" placeholder="例如：002、440000、王小明、011（均為示意）&#10;也可輸入：內務櫃未確實上鎖 002 011"></textarea>
+      <div id="pQuick" class="quick-phrases">
+        <div class="qp-head"><div>常用狀況　<span class="note">點分類再點項目，文字會填進游標位置；可自行新增、刪除，長按可拖拉調整順序</span></div><button type="button" id="pQuickEditCats" class="qp-edit" aria-pressed="false">編輯分類</button></div>
+        <div id="pQuickCats" class="qp-cats" role="tablist" aria-label="常用狀況分類"></div>
+        <div id="pQuickItems" class="qp-items" role="group" aria-label="常用狀況項目" hidden></div>
+        <p id="pQuickHint" class="qp-hint" role="status" aria-live="polite"></p>
+      </div>
+      <div id="pCheck" class="check-panel" aria-live="polite">尚未輸入學生資料</div>
+      <p class="note">可用頓號、逗號、空白或換行分隔；女生隊號可輸入 2 或 002，也可輸入範圍 002-010（須寫三位數）。同一批次相同學生只登錄一次。學生前可加註記（例如「內務櫃未確實上鎖 002 011」或「文書公差：002」），註記會以括號附加在該生說明後方。</p>
+      <div class="grid">
+        <div><label for="pKind">加扣分類型</label><select id="pKind"><option>加分</option><option>扣分</option></select></div>
+        <div><label for="pScore">分數（0.1 至 0.8，每次 0.1 分）</label><select id="pScore"></select></div>
+      </div>
+      <div class="reason-favorites"><h3>常用分類</h3><p id="pFavoriteHint" class="note"></p><div id="pFavorites" role="group" aria-label="常用分類"></div></div>
+      <label for="pDetail">說明（可自行編輯）</label>
+      <textarea id="pDetail" placeholder="例如：擔任公差，工作認真負責。"></textarea>
+      <label for="pCategory">加減分依據（歸類）</label><select id="pCategory"></select>
+      <label for="pItem">事蹟說明</label><select id="pItem"></select>
+      <details class="reason-browser" id="pBrowser">
+        <summary>瀏覽／搜尋全部分類的事蹟說明</summary>
+        <label for="pSearch">搜尋事蹟或分類名稱</label>
+        <input id="pSearch" type="search" placeholder="輸入關鍵字，例如：內務、公差" autocomplete="off">
+        <p class="note">顯示目前加扣分類型的所有分類；點選事蹟會自動帶入正確歸類。</p>
+        <p id="pResultCount" class="note" role="status" aria-live="polite"></p>
+        <div id="pResults" class="reason-results" role="group" aria-label="全分類事蹟說明"></div>
+      </details>
+      <p id="pError" class="err" role="status"></p>
+      <button id="pAdd" type="button">批次新增紀錄</button>
+    </section>
+
+    <section>
+      <h2>② 預覽與匯出</h2>
+      <p id="pCount" class="summary-line">尚無紀錄</p>
+<div class="list-tools">
+        <div class="view-seg" role="group" aria-label="手機預覽方式"><button type="button" data-view="compact">精簡</button><button type="button" data-view="full">完整</button></div>
+        <details class="groups-box" id="pGroupsBox" open hidden><summary id="pGroupsTitle">依事由分組</summary><div id="pGroups" class="groups"></div></details>
+        <div class="filter-bar" id="pFilterBar" hidden><select id="pFilterCohort" aria-label="篩選期別"></select><input id="pFilterText" type="search" placeholder="搜尋姓名、隊號、學號" aria-label="搜尋姓名、隊號、學號" autocomplete="off"><button type="button" id="pFilterClear" class="secondary" hidden>清除篩選</button></div>
+        <p id="pFilterInfo" class="note" role="status"></p>
+      </div>
+      <div id="pBulkTop" class="bulk-tools"><label class="check-label"><input id="pSelectAll" type="checkbox"> 全選</label><span id="pSelected" role="status">已勾選 0 筆</span><span class="note bulk-hint">小技巧：電腦按住 Shift 可連續勾選；手機按住勾選框上下滑動可連續勾選</span></div>
+      <div class="tablewrap records"><table>
+        <thead><tr><th class="col-select">勾選</th><th class="col-actions">操作</th><th>期別</th><th>女生隊號</th><th>建制隊號</th><th>姓名</th><th>說明</th><th>學籍號碼</th><th>類型</th><th>分數</th><th>事由</th></tr></thead>
+        <tbody id="pRecords"></tbody>
+      </table></div>
+      <div class="bulk-tools bulk-bottom"><label class="check-label"><input id="pSelectAllBottom" type="checkbox"> 全選</label><span id="pSelectedBottom" role="status">已勾選 0 筆</span></div>
+      <div class="actions">
+        <button id="pExport" type="button" disabled>下載學校格式 Excel (.xlsx)</button>
+        <button id="pClear" type="button" class="secondary" disabled>清空紀錄</button>
+      </div>
+      <p class="note">尚未匯出的紀錄也會加密保存在本機，重新開啟後仍在。匯出以學校範本為底，只改寫「工作表1」的資料列，其餘格式不變；兩期學生可放在同一份檔案。正式匯入學校系統前請再檢查一次。</p>
+    </section>
+  </div>
+
+  <!-- ═════════ 獎懲 ═════════ -->
+  <div id="tab-reward" class="tabpanel" role="tabpanel" aria-labelledby="tabBtn-reward" hidden>
+    <section>
+      <div class="h2-row"><h2>① 批次登錄</h2><div class="batch-clear"><button type="button" id="rBatchClear" class="danger" disabled>清空紀錄</button><span id="rPrevNote" class="prev-note" role="status" aria-live="polite"></span></div></div>
+      <div class="input-cohort">查詢對象：<span class="cohort-tag active-cohort-tag"></span>（只在這一期的名冊中查找）</div>
+      <label for="rIds">輸入學生（可多筆）</label>
+      <textarea id="rIds" placeholder="例如：002、449999、王小明（可混合輸入）&#10;也可輸入：文書公差：002"></textarea>
+      <div id="rCheck" class="check-panel" aria-live="polite">尚未輸入學生資料</div>
+      <p class="note">支援女生隊號、建制隊號、姓名混合輸入，可用換行、逗號、頓號或空格分隔，也可輸入範圍（例如 002-010，須寫三位數）。同批或不同批次的重複學生均會新增，預覽下方會以紅字顯示重複次數。學生前可加註記（例如「文書公差002」「文書公差：002」），批次新增時會在該筆事由後加上「（文書公差）」。</p>
+    </section>
+    <section>
+      <h2>② 設定共同獎懲內容</h2>
+      <p class="note">依序選擇條、款、目，系統會帶入範本事由，帶入後可自行修改。</p>
+      <label for="rArticle">1. 獎懲依據（條）</label><select id="rArticle"></select>
+      <label for="rClause">2. 獎懲依據（款）</label><select id="rClause" disabled></select>
+      <label for="rItem">3. 獎懲依據（目）</label><select id="rItem" disabled></select>
+      <label for="rReason">4. 獎懲事由（自動帶入後可編輯）</label><textarea id="rReason" disabled placeholder="選擇條、款、目後自動帶入，可自行修改內容"></textarea>
+      <label for="rAmount">5. 額度（固定，自動帶入）</label><input id="rAmount" type="text" readonly disabled placeholder="選擇條款目後自動帶入固定額度">
+      <label for="rAdjustReason">6. 加重減輕事由（若無可不選擇）</label><select id="rAdjustReason"></select>
+      <label for="rAdjustAmount">7. 加重減輕額度（若無可不選擇）</label><select id="rAdjustAmount"></select>
+      <div class="actions">
+        <button id="rAdd" type="button">批次新增至預覽</button>
+        <button id="rClearInput" type="button" class="secondary">清除輸入</button>
+      </div>
+    </section>
+    <section>
+      <h2>③ 預覽與匯出</h2>
+      <div id="rResult" role="status" class="status">尚未新增紀錄</div>
+<div class="list-tools">
+        <div class="view-seg" role="group" aria-label="手機預覽方式"><button type="button" data-view="compact">精簡</button><button type="button" data-view="full">完整</button></div>
+        <details class="groups-box" id="rGroupsBox" open hidden><summary id="rGroupsTitle">依事由分組</summary><div id="rGroups" class="groups"></div></details>
+        <div class="filter-bar" id="rFilterBar" hidden><select id="rFilterCohort" aria-label="篩選期別"></select><input id="rFilterText" type="search" placeholder="搜尋姓名、隊號、學號" aria-label="搜尋姓名、隊號、學號" autocomplete="off"><button type="button" id="rFilterClear" class="secondary" hidden>清除篩選</button></div>
+        <p id="rFilterInfo" class="note" role="status"></p>
+      </div>
+      <div class="bulk-tools"><label class="check-label"><input type="checkbox" id="rSelectAll" disabled> 全選</label><span id="rSelected" role="status">已勾選 0 筆</span><span class="note bulk-hint">小技巧：電腦按住 Shift 可連續勾選；手機按住勾選框上下滑動可連續勾選</span></div>
+      <div class="tablewrap records"><table>
+        <thead><tr><th class="col-select">勾選</th><th class="col-actions">操作</th><th>期別</th><th>學號</th><th>姓名</th><th>條</th><th>款</th><th>目</th><th>獎懲事由</th><th>額度</th><th>加重減輕事由</th><th>加重減輕額度</th></tr></thead>
+        <tbody id="rBody"></tbody>
+      </table></div>
+      <div class="bulk-tools bulk-bottom"><label class="check-label"><input type="checkbox" id="rSelectAllBottom" disabled> 全選</label><span id="rSelectedBottom" role="status">已勾選 0 筆</span></div>
+      <div id="rDup" role="status" class="status error" hidden></div>
+      <div class="actions">
+        <button id="rExport" type="button" disabled>匯出 Excel</button>
+        <button id="rClearRecords" type="button" class="danger" disabled>清空紀錄</button>
+      </div>
+      <p class="note">尚未匯出的紀錄也會加密保存在本機。iPhone 下載後可到「檔案」App 開啟。</p>
+    </section>
+  </div>
+
+  <!-- ═════════ 設定 ═════════ -->
+  <div id="tab-settings" class="tabpanel" role="tabpanel" aria-labelledby="tabBtn-settings" hidden>
+    <section>
+      <h2>期別名冊</h2>
+      <p class="note">每一期各匯入一份名冊（讀取「姓名查詢」工作表）。不同期的女生隊號可以重複，查詢時只會在上方選定的期別裡找。換學期或名冊有異動時，用「更新名冊」覆蓋即可。</p>
+      <div id="cohortList"></div>
+      <span class="button file-button">＋ 匯入名冊 Excel<input type="file" id="rosterFile" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" aria-label="匯入名冊 Excel"></span>
+      <div id="rosterPending" class="pending" hidden>
+        <p id="rosterPendingInfo" class="summary-line"></p>
+        <label for="rosterTarget">存成</label>
+        <select id="rosterTarget"></select>
+        <div id="rosterLabelWrap"><label for="rosterLabel">期別名稱</label><input id="rosterLabel" placeholder="例如：第45期"></div>
+        <p id="rosterPendingWarn" class="err"></p>
+        <div class="actions"><button id="rosterSave" type="button">儲存名冊</button><button id="rosterCancel" type="button" class="secondary">取消</button></div>
+      </div>
+      <div id="rosterStatus" class="status" role="status" hidden></div>
+    </section>
+
+    <section>
+      <h2>學校範本</h2>
+      <p class="note">範本兩期共用，各匯入一次即可；學校更新範本時再重新匯入。</p>
+      <div class="tpl-row">
+        <h3>加扣分範本（外收發加扣分匯入.xlsx）</h3>
+        <div id="pTplStatus" class="status">尚未匯入</div>
+        <span class="button file-button secondary-file">選擇加扣分範本<input type="file" id="pTplFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" aria-label="選擇加扣分範本"></span>
+      </div>
+      <div class="tpl-row">
+        <h3>獎懲範本</h3>
+        <div id="rTplStatus" class="status">尚未匯入</div>
+        <span class="button file-button secondary-file">選擇獎懲範本<input type="file" id="rTplFile" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" aria-label="選擇獎懲範本"></span>
+      </div>
+    </section>
+
+    <section>
+      <h2>安全與本機資料</h2>
+      <div id="pwNoneBox">
+        <p class="note">目前<strong>沒有設定開啟密碼</strong>，打開 App 就會直接顯示學生資料。只有你自己使用的裝置可以這樣用；若在公用電腦上使用，建議設定密碼。</p>
+        <details>
+          <summary><strong>設定開啟密碼</strong></summary>
+          <form id="pwSetForm" autocomplete="off">
+            <label for="pwSet1">開啟密碼（至少 6 個字元）</label><input id="pwSet1" type="password" autocomplete="new-password" minlength="6" required>
+            <label for="pwSet2">再輸入一次</label><input id="pwSet2" type="password" autocomplete="new-password" minlength="6" required>
+            <p class="note">⚠️ 密碼忘記無法找回，只能清除本機資料後重新匯入。</p>
+            <button type="submit">設定密碼</button>
+            <p id="pwSetStatus" role="status"></p>
+          </form>
+        </details>
+      </div>
+      <div id="pwSetBox">
+      <label for="autoLock">閒置自動鎖定</label>
+      <select id="autoLock">
+        <option value="5">5 分鐘</option><option value="10">10 分鐘</option><option value="15">15 分鐘</option>
+        <option value="30">30 分鐘</option><option value="60">60 分鐘</option><option value="0">不自動鎖定（僅限個人裝置）</option>
+      </select>
+      <p class="note">在公用電腦上，離開座位前請按右上角「鎖定」。鎖定後必須輸入密碼才能看到學生資料。</p>
+
+      <details>
+        <summary><strong>變更開啟密碼</strong></summary>
+        <form id="pwForm" autocomplete="off">
+          <label for="pwOld">目前密碼</label><input id="pwOld" type="password" autocomplete="current-password" required>
+          <label for="pwNew">新密碼（至少 6 個字元）</label><input id="pwNew" type="password" autocomplete="new-password" minlength="6" required>
+          <label for="pwNew2">再輸入一次新密碼</label><input id="pwNew2" type="password" autocomplete="new-password" minlength="6" required>
+          <button type="submit">變更密碼</button>
+          <p id="pwStatus" role="status"></p>
+        </form>
+      </details>
+      <details>
+        <summary><strong>取消開啟密碼</strong></summary>
+        <form id="pwRemoveForm" autocomplete="off">
+          <p class="note">取消後，打開 App 就直接進入，不再詢問密碼。</p>
+          <label for="pwRemoveOld">目前密碼</label><input id="pwRemoveOld" type="password" autocomplete="current-password" required>
+          <button type="submit" class="danger">取消密碼</button>
+          <p id="pwRemoveStatus" role="status"></p>
+        </form>
+      </details>
+      </div>
+
+      <p id="persistStatus" class="note"></p>
+      <p class="note">資料只存在「這台裝置的這個瀏覽器」。換電腦、換瀏覽器或清除瀏覽器網站資料後，需要重新匯入。iPhone 建議用 Safari「加入主畫面」後從主畫面開啟，資料比較不會被系統清掉。</p>
+      <button id="wipeAll" type="button" class="solid-danger">清除本機全部資料</button>
+    </section>
+    <p class="note" style="text-align:center">版本 2026.10.19n</p>
+  </div>
+  </main>
+</div>
+
+<div id="selBar" role="region" aria-label="勾選紀錄操作" hidden><button id="selBarEdit" type="button">編輯</button><button id="selBarDelete" type="button">刪除</button><span class="sel-text" role="status" aria-live="polite"><strong id="selBarCount"></strong></span><button id="selBarClear" type="button">取消勾選</button></div>
+<button id="toTop" type="button" hidden aria-label="回到頂端" title="回到頂端">↑</button>
+
+
+
+<script>
+(function () {
+  "use strict";
+  window.reportStartupError = function (message) {
+    var status = document.getElementById("bootStatus");
+    if (status) { status.textContent = "程式錯誤：" + message; status.className = "status error"; }
+  };
+  window.addEventListener("error", function (event) {
+    if (event.target && event.target.tagName === "SCRIPT") window.reportStartupError("元件載入失敗，請重新整理網頁。");
+    else if (event.message && document.documentElement.dataset.appReady !== "true") window.reportStartupError(event.message);
+  }, true);
+})();
+</script>
+<script defer src="./vendor/xlsx.full.min.js?v=0.20.3"></script>
+<script defer src="./js/core.js?v=20261019q"></script>
+<script defer src="./js/store.js?v=20261019q"></script>
+<script defer src="./js/dorm-core.js?v=20261019q"></script>
+<script defer src="./js/dorm.js?v=20261019q"></script>
+<script defer src="./js/app.js?v=20261019q"></script>
+<script>if ("serviceWorker" in navigator && location.protocol === "https:") window.addEventListener("load", function () { navigator.serviceWorker.register("./sw.js").catch(function () {}); });</script>
+</body>
+</html>
