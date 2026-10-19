@@ -12,7 +12,7 @@
   let data = null;                  // {mapping, autoPoints, inspectors, byCohort:{[cohortId]:{roomsText, rooms, reports:{date:report}}}}
   let draft = null, pendingOverwrite = false;   // pendingOverwrite：同一天已有檢查，等使用者選「另外新增」或「取代」
   let sub = "entry", month = null;
-  const q = {from: null, to: null, room: "", person: "", view: "room", sort: {k: "s", dir: 1}};
+  const q = {from: null, to: null, room: "", person: "", view: "room", sort: {k: "s", dir: 1}, rsort: {k: "t", dir: -1}};
   let idxCache = {id: null, idx: null}, bound = false, roomsEditing = false;   // roomsEditing：寢室名單已存過時，要按「重新輸入」才能改
 
   /* ───── 資料 ───── */
@@ -81,7 +81,7 @@
       <section>
         <div class="d-row" style="justify-content:space-between">
           <label class="d-inline">月份 <select id="dMonth"></select></label>
-          <button type="button" id="dCopy" class="secondary">複製結果到 LINE</button>
+          <span class="d-row"><button type="button" id="dCopy" class="secondary d-small">複製結果到 LINE</button>${exportBtns("month")}</span>
         </div>
         <div id="dStatsWarn"></div>
         <div class="d-verdict" id="dVerdict"></div>
@@ -134,7 +134,7 @@
     </div>
 
     <div data-pane="history" hidden>
-      <section><h2>已登錄的檢查</h2><div id="dHistory"></div></section>
+      <section><div class="h2-row"><h2>已登錄的檢查</h2>${exportBtns("history")}</div><div id="dHistory"></div></section>
     </div>`;
   }
 
@@ -336,6 +336,29 @@
   }
   const stat = (l, s, cls) => `<div class="d-stat"><span class="note">${l}</span><b class="${cls || ""}">${s}</b></div>`;
 
+  /* 寢室總覽、個人總覽的資料（畫面和匯出共用，依目前的排序） */
+  function roomRows(E) {
+    const rows = cdata().rooms.map(r => {
+      const pe = E.filter(e => e.scope === "p" && r.members.includes(e.target)), ge = E.filter(e => e.scope === "g" && e.target === r.room);
+      const ps = pe.reduce((s, e) => s + D.pts(e), 0), gs = ge.reduce((s, e) => s + D.pts(e), 0);
+      return {room: r.room, pp: pe.filter(e => e.sign > 0).length, pm: pe.filter(e => e.sign < 0).length, gp: ge.filter(e => e.sign > 0).length, gm: ge.filter(e => e.sign < 0).length, ps, gs, t: ps + gs};
+    });
+    const byRoom = (a, b) => a.room.localeCompare(b.room, "zh-Hant", {numeric: true});
+    const k = q.rsort.k;
+    return rows.sort((a, b) => (k === "room" ? byRoom(a, b) : a[k] - b[k]) * q.rsort.dir || byRoom(a, b));
+  }
+  const rth = (k, label, r) => `<th class="${r ? "r " : ""}d-sortable" data-rsort="${k}">${label}${q.rsort.k === k ? (q.rsort.dir > 0 ? " ▲" : " ▼") : ""}</th>`;
+  function personRows(E) {
+    const mm = memberMap();
+        const pr = (cohort().students || []).map(s => { const l = E.filter(e => e.scope === "p" && e.target === s.school);
+          return {k: s.school, f: s.female || s.team, name: s.name, room: mm.get(s.school) || "", plus: l.filter(e => e.sign > 0).length, minus: l.filter(e => e.sign < 0).length, s: l.reduce((a, e) => a + D.pts(e), 0)}; });
+        const X = extremes(pr, ["plus", "minus", "s"]);
+        const cmp = {f: (a, b) => a.f.localeCompare(b.f, "zh-Hant", {numeric: true}), name: (a, b) => a.name.localeCompare(b.name, "zh-Hant"), room: (a, b) => a.room.localeCompare(b.room, "zh-Hant", {numeric: true}),
+          plus: (a, b) => a.plus - b.plus, minus: (a, b) => a.minus - b.minus, s: (a, b) => a.s - b.s}[q.sort.k];
+        pr.sort((a, b) => cmp(a, b) * q.sort.dir || a.f.localeCompare(b.f, "zh-Hant", {numeric: true}));
+    return pr;
+  }
+
   function renderQuery() {
     if (!q.from) [q.from, q.to] = relMonth(0);
     $("qFrom").value = q.from; $("qTo").value = q.to;
@@ -369,28 +392,20 @@
     } else {
       const seg = `<div class="d-seg" role="group"><button type="button" data-view="room" aria-pressed="${q.view === "room"}">寢室總覽</button><button type="button" data-view="person" aria-pressed="${q.view === "person"}">個人總覽</button></div>`;
       if (q.view === "person") {
-        const pr = students.map(s => { const l = E.filter(e => e.scope === "p" && e.target === s.school);
-          return {k: s.school, f: s.female || s.team, name: s.name, room: mm.get(s.school) || "", plus: l.filter(e => e.sign > 0).length, minus: l.filter(e => e.sign < 0).length, s: l.reduce((a, e) => a + D.pts(e), 0)}; });
+        const pr = personRows(E);
         const X = extremes(pr, ["plus", "minus", "s"]);
-        const cmp = {f: (a, b) => a.f.localeCompare(b.f, "zh-Hant", {numeric: true}), name: (a, b) => a.name.localeCompare(b.name, "zh-Hant"), room: (a, b) => a.room.localeCompare(b.room, "zh-Hant", {numeric: true}),
-          plus: (a, b) => a.plus - b.plus, minus: (a, b) => a.minus - b.minus, s: (a, b) => a.s - b.s}[q.sort.k];
-        pr.sort((a, b) => cmp(a, b) * q.sort.dir || a.f.localeCompare(b.f, "zh-Hant", {numeric: true}));
         const th = (k, label, r) => `<th class="${r ? "r " : ""}d-sortable" data-psort="${k}">${label}${q.sort.k === k ? (q.sort.dir > 0 ? " ▲" : " ▼") : ""}</th>`;
-        h = `<section><div class="h2-row">${seg}<span class="note">${range}・${nRep} 次檢查</span></div>
+        h = `<section><div class="h2-row">${seg}<span class="note">${range}・${nRep} 次檢查</span>${exportBtns(q.view === "person" ? "people" : "rooms")}</div>
           <p class="note">${pr.length} 人：${pr.filter(r => r.plus).length} 人有優點、${pr.filter(r => r.minus).length} 人有缺點。點欄位名稱可以排序，點隊號看個人明細。${legend}</p>
           <div class="d-tablewrap"><table class="d-table"><thead><tr>${th("f", "隊號")}${th("name", "姓名")}${th("room", "寢室")}${th("plus", "優", 1)}${th("minus", "缺", 1)}${th("s", "分數", 1)}</tr></thead><tbody>${
             pr.map(r => `<tr><td><a href="#" data-goperson="${esc(r.k)}">${esc(r.f)}</a></td><td>${esc(r.name)}</td><td>${r.room ? esc(RL(r.room)) : "—"}</td><td class="r ${hlOf(X, "plus", r.plus, "good")}">${r.plus}</td><td class="r ${hlOf(X, "minus", r.minus, "bad")}">${r.minus}</td><td class="r ${tone(r.s)} ${hlOf(X, "s", r.s)}">${fmt(r.s)}</td></tr>`).join("") || `<tr><td colspan="6" class="note">這一期名冊沒有學生。</td></tr>`}</tbody></table></div></section>`;
       } else {
-        const rows = cd.rooms.map(r => {
-          const pe = E.filter(e => e.scope === "p" && r.members.includes(e.target)), ge = E.filter(e => e.scope === "g" && e.target === r.room);
-          const ps = pe.reduce((s, e) => s + D.pts(e), 0), gs = ge.reduce((s, e) => s + D.pts(e), 0);
-          return {room: r.room, pp: pe.filter(e => e.sign > 0).length, pm: pe.filter(e => e.sign < 0).length, gp: ge.filter(e => e.sign > 0).length, gm: ge.filter(e => e.sign < 0).length, ps, gs, t: ps + gs};
-        }).sort((a, b) => b.t - a.t || a.room.localeCompare(b.room, "zh-Hant", {numeric: true}));
+        const rows = roomRows(E);
         const X = rows.length ? extremes(rows, ["pp", "pm", "gp", "gm", "ps", "gs", "t"]) : {};
         const c = (k, v, kind) => rows.length ? hlOf(X, k, v, kind) : "";
-        h = `<section><div class="h2-row">${seg}<span class="note">${range}・${nRep} 次檢查</span></div>
-          <p class="note">點寢室可以看明細，或在上方輸入隊號、姓名查個人。${legend}</p>
-          <div class="d-tablewrap"><table class="d-table"><thead><tr><th>寢室</th><th class="r">個人優</th><th class="r">個人缺</th><th class="r">公區優</th><th class="r">公區缺</th><th class="r">個人分</th><th class="r">公區分</th><th class="r">總分</th></tr></thead><tbody>${
+        h = `<section><div class="h2-row">${seg}<span class="note">${range}・${nRep} 次檢查</span>${exportBtns(q.view === "person" ? "people" : "rooms")}</div>
+          <p class="note">點欄位名稱可以排序，點寢室看明細，或在上方輸入隊號、姓名查個人。${legend}</p>
+          <div class="d-tablewrap"><table class="d-table"><thead><tr>${rth("room", "寢室")}${rth("pp", "個人優", 1)}${rth("pm", "個人缺", 1)}${rth("gp", "公區優", 1)}${rth("gm", "公區缺", 1)}${rth("ps", "個人分", 1)}${rth("gs", "公區分", 1)}${rth("t", "總分", 1)}</tr></thead><tbody>${
             rows.map(r => `<tr><td><a href="#" data-goroom="${esc(r.room)}">${esc(RL(r.room))}</a></td><td class="r ${c("pp", r.pp, "good")}">${r.pp}</td><td class="r ${c("pm", r.pm, "bad")}">${r.pm}</td><td class="r ${c("gp", r.gp, "good")}">${r.gp}</td><td class="r ${c("gm", r.gm, "bad")}">${r.gm}</td><td class="r ${tone(r.ps)} ${c("ps", r.ps)}">${fmt(r.ps)}</td><td class="r ${tone(r.gs)} ${c("gs", r.gs)}">${fmt(r.gs)}</td><td class="r ${tone(r.t)} ${c("t", r.t)}"><b>${fmt(r.t)}</b></td></tr>`).join("") || `<tr><td colspan="8" class="note">先到「寢室名單與設定」設定寢室名單。</td></tr>`}</tbody></table></div></section>`;
       }
     }
@@ -514,6 +529,80 @@
     copyTimer = setTimeout(() => { btn.textContent = "複製"; btn.classList.remove("done"); }, 1800);
   }
 
+  /* ═════ 匯出報表（Excel／PDF） ═════ */
+  const exportBtns = kind => `<span class="d-export"><button type="button" class="secondary d-small" data-export="${kind}" data-fmt="xlsx">匯出 Excel</button><button type="button" class="secondary d-small" data-export="${kind}" data-fmt="pdf">PDF／列印</button></span>`;
+  const num = t => Math.round(t) / 10;   // 0.1 分為單位 → 分數
+  function buildReport(kind) {
+    const c = cohort(), stamp = D.todayStr();
+    if (kind === "month") {
+      const [from, to] = D.monthRange(month), S = D.summarize(reportsList(), cdata().rooms, from, to);
+      const names = (rs, pred) => rs.flatMap(r => r.members.map(k => ({k, s: (S.people.get(k) || {score: 0}).score}))).filter(x => pred(x.s)).map(x => who(x.k) + " " + nameOf(x.k) + "（" + fmt(x.s) + "）").join("、") || "無";
+      const summary = [];
+      if (S.worst.length) summary.push("最劣寢：" + S.worst.map(r => RL(r.room)).join("、") + "（" + fmt(S.worst[0].total) + "）", "　負分同學：" + names(S.worst, v => v < 0));
+      if (S.best.length) summary.push("最優寢：" + S.best.map(r => RL(r.room)).join("、") + "（" + fmt(S.best[0].total) + "）", "　正分同學：" + names(S.best, v => v > 0));
+      return {title: D.rocMonth(month) + " 內務統計", subtitle: c.label + "・共 " + S.reportCount + " 次檢查・" + from + " 至 " + to, summary, sheet: "月統計",
+        columns: ["名次", "寢室", "室員合計", "公區", "總分"], numFrom: 2,
+        rows: S.rooms.slice().reverse().map((r, i) => [i + 1, RL(r.room), num(r.mScore), num(r.pub), num(r.total)]),
+        file: "內務月統計_" + D.rocMonth(month)};
+    }
+    if (kind === "rooms" || kind === "people") {
+      if (!q.from) [q.from, q.to] = relMonth(0);
+      const E = D.entries(reportsList(), q.from, q.to), nRep = new Set(E.map(e => e.date)).size;
+      const sub = c.label + "・" + q.from + " 至 " + q.to + "・" + nRep + " 次檢查";
+      if (kind === "rooms") return {title: "寢室總覽", subtitle: sub, summary: [], sheet: "寢室總覽", numFrom: 1,
+        columns: ["寢室", "個人優", "個人缺", "公區優", "公區缺", "個人分", "公區分", "總分"],
+        rows: roomRows(E).map(r => [RL(r.room), r.pp, r.pm, r.gp, r.gm, num(r.ps), num(r.gs), num(r.t)]), file: "寢室總覽_" + q.from + "_" + q.to};
+      return {title: "個人總覽", subtitle: sub, summary: [], sheet: "個人總覽", numFrom: 4,
+        columns: ["女生隊號", "建制隊號", "姓名", "寢室", "優", "缺", "分數"],
+        rows: personRows(E).map(r => { const s = stu(r.k) || {}; return [s.female || "", s.team || "", r.name, r.room ? RL(r.room) : "", r.plus, r.minus, num(r.s)]; }),
+        file: "個人總覽_" + q.from + "_" + q.to};
+    }
+    // 檢查紀錄：每一筆優缺點一列
+    const list = reportsList(), rows = [];
+    list.forEach(r => {
+      const nth = nthLabel(r);
+      (r.items || []).forEach(it => it.targets.forEach(t => {
+        const p = it.scope === "p", s = p ? stu(t) : null;
+        rows.push([r.date, nth, r.inspector || "", p ? "個人" : "公區", it.item, p ? (s ? s.female || s.team : t) : RL(t), p ? (s ? s.name : "") : "", (it.notes || {})[t] || "", num(D.pts({scope: it.scope, sign: it.sign}))]);
+      }));
+    });
+    return {title: "內務檢查紀錄", subtitle: c.label + "・共 " + list.length + " 次檢查" + (list.length ? "・" + list[0].date + " 至 " + list[list.length - 1].date : ""), summary: [], sheet: "檢查紀錄", numFrom: 8,
+      columns: ["日期", "第幾次", "檢查人", "類別", "項目", "隊號／寢室", "姓名", "註記", "分數"], rows, file: "內務檢查紀錄_" + stamp};
+  }
+  function exportReport(kind, fmtType) {
+    if (!cohort()) return;
+    const rep = buildReport(kind);
+    if (fmtType === "xlsx") {
+      const XL = window.XLSX;
+      if (!XL) { alert("Excel 元件沒有載入，請重新整理後再試。"); return; }
+      const aoa = [[rep.title], [rep.subtitle]].concat(rep.summary.map(x => [x]), [[]], [rep.columns], rep.rows);
+      const ws = XL.utils.aoa_to_sheet(aoa);
+      ws["!cols"] = rep.columns.map((col, i) => ({wch: Math.max(6, col.length * 2 + 2, ...rep.rows.slice(0, 300).map(r => String(r[i] == null ? "" : r[i]).length * (typeof r[i] === "number" ? 1 : 2)))}));
+      // 分數欄顯示一位小數、正數加「+」
+      rep.rows.forEach((row, ri) => row.forEach((v, ci) => {
+        if (typeof v !== "number" || ci < rep.numFrom || !/分$|^室員合計$|^公區$/.test(rep.columns[ci])) return;
+        const cell = ws[XL.utils.encode_cell({r: ri + aoa.length - rep.rows.length, c: ci})]; if (cell) cell.z = "+0.0;-0.0;0.0";
+      }));
+      const wb = XL.utils.book_new(); XL.utils.book_append_sheet(wb, ws, rep.sheet);
+      B.download(new Uint8Array(XL.write(wb, {type: "array", bookType: "xlsx"})), rep.file + ".xlsx");
+      return;
+    }
+    // PDF：開啟列印，選「另存為 PDF」
+    let el = $("dPrint");
+    if (!el) { el = document.createElement("div"); el.id = "dPrint"; document.body.append(el); }
+    const isScore = i => i >= rep.numFrom && /分$|^室員合計$|^公區$/.test(rep.columns[i]);
+    const cell = (v, i) => typeof v === "number" ? (isScore(i) ? (v > 0 ? "+" : "") + v.toFixed(1) : String(v)) : esc(v);
+    el.innerHTML = `<h1>${esc(rep.title)}</h1><p class="sub">${esc(rep.subtitle)}・列印日期 ${D.todayStr()}</p>` +
+      rep.summary.map(x => `<p>${esc(x)}</p>`).join("") +
+      `<table><thead><tr>${rep.columns.map((col, i) => `<th class="${i >= rep.numFrom ? "r" : ""}">${esc(col)}</th>`).join("")}</tr></thead><tbody>` +
+      (rep.rows.map(r => `<tr>${r.map((v, i) => `<td class="${i >= rep.numFrom ? "r" : ""}">${cell(v, i)}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${rep.columns.length}">沒有資料</td></tr>`) +
+      `</tbody></table>`;
+    document.body.classList.add("d-printing");
+    const done = () => { document.body.classList.remove("d-printing"); window.removeEventListener("afterprint", done); };
+    window.addEventListener("afterprint", done);
+    setTimeout(() => { window.print(); setTimeout(done, 1000); }, 50);
+  }
+
   /* ═════ 事件 ═════ */
   function bind() {
     const root = $("tab-dorm");
@@ -541,6 +630,8 @@
         renderQuery(); return;
       }
       const v = t.closest("[data-view]"); if (v) { q.view = v.dataset.view; renderQuery(); return; }
+      const rs = t.closest("[data-rsort]"); if (rs) { const k = rs.dataset.rsort; q.rsort = q.rsort.k === k ? {k, dir: -q.rsort.dir} : {k, dir: k === "room" ? 1 : -1}; renderQuery(); return; }
+      const ex = t.closest("[data-export]"); if (ex) { exportReport(ex.dataset.export, ex.dataset.fmt); return; }
       const so = t.closest("[data-psort]"); if (so) { const k = so.dataset.psort; q.sort = q.sort.k === k ? {k, dir: -q.sort.dir} : {k, dir: ["s", "plus", "minus"].includes(k) ? -1 : 1}; renderQuery(); return; }
       const gr = t.closest("[data-goroom]"); if (gr) { e.preventDefault(); q.room = gr.dataset.goroom; q.person = ""; $("qPerson").value = ""; renderQuery(); window.scrollTo({top: 0}); return; }
       const gp = t.closest("[data-goperson]"); if (gp) { e.preventDefault(); const k = gp.dataset.goperson; q.person = who(k); $("qPerson").value = who(k) + " " + nameOf(k); renderQuery(); window.scrollTo({top: 0}); return; }
