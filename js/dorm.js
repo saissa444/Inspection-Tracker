@@ -55,7 +55,7 @@
 
     <div data-pane="entry">
       <section>
-        <h2>貼上內務公告</h2>
+        <div class="label-row"><h2 style="margin:0">貼上內務公告</h2><button type="button" id="dRawCopy" class="copy-btn secondary" aria-label="複製公告內容">複製</button></div>
         <div class="input-cohort">對象：<span class="cohort-tag active-cohort-tag"></span>（用這一期的名冊辨識女生隊號、建制隊號）</div>
         <textarea id="dRaw" style="min-height:180px" placeholder="把 LINE 上的內務檢查公告整則貼上，例如：&#10;1151019內務檢查&#10;被優：002 003&#10;棉被不潔 088 444194&#10;公物&#10;窗溝不潔 育五7、6-2"></textarea>
         <div id="dQuickSlot"></div>
@@ -493,6 +493,27 @@
     } catch (e) { msg("dImportMsg", "匯入失敗：" + e.message, "error"); }
   }
 
+  // 複製公告框內容（和加扣分「輸入學生」旁的複製鍵一樣，方便貼到 LINE）
+  let copyTimer = null;
+  async function copyRaw(btn) {
+    const text = $("dRaw").value.split("\n").map(l => l.replace(/[ \t\u3000]+$/, "")).join("\n").trim();
+    let ok = false;
+    if (text) {
+      try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); ok = true; } } catch (e) { ok = false; }
+      if (!ok) {
+        const tmp = document.createElement("textarea");
+        tmp.value = text; tmp.setAttribute("readonly", ""); tmp.style.cssText = "position:fixed;top:0;left:0;opacity:0;font-size:16px";
+        document.body.appendChild(tmp); tmp.select(); tmp.setSelectionRange(0, text.length);
+        try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+        tmp.remove();
+      }
+    }
+    clearTimeout(copyTimer);
+    btn.textContent = !text ? "沒有內容" : ok ? "已複製 ✓" : "無法複製";
+    btn.classList.toggle("done", ok);
+    copyTimer = setTimeout(() => { btn.textContent = "複製"; btn.classList.remove("done"); }, 1800);
+  }
+
   /* ═════ 事件 ═════ */
   function bind() {
     const root = $("tab-dorm");
@@ -501,6 +522,7 @@
       const sb = t.closest("[data-sub]"); if (sb) { showSub(sb.dataset.sub); return; }
       const pi = t.closest("[data-pickinsp]"); if (pi) { $("dInsp").value = pi.dataset.pickinsp; renderDraft(); return; }
       const f = t.closest("[data-flip]"); if (f && draft) { const it = draft.items[+f.dataset.flip]; it.sign *= -1; renderDraft(); return; }
+      if (t.id === "dRawCopy") { copyRaw(t); return; }
       if (t.id === "dSaveBtn") return saveDraft(false);
       if (t.id === "dSaveNew") return saveDraft("new");
       const rp = t.closest("[data-replace]"); if (rp) return saveDraft(rp.dataset.replace);
