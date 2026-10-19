@@ -13,7 +13,7 @@
   let draft = null, pendingOverwrite = false;   // pendingOverwrite：同一天已有檢查，等使用者選「另外新增」或「取代」
   let sub = "entry", month = null;
   const q = {from: null, to: null, room: "", person: "", view: "room", sort: {k: "s", dir: 1}};
-  let idxCache = {id: null, idx: null}, bound = false;
+  let idxCache = {id: null, idx: null}, bound = false, roomsEditing = false;   // roomsEditing：寢室名單已存過時，要按「重新輸入」才能改
 
   /* ───── 資料 ───── */
   const cohort = () => B && B.activeCohort();
@@ -110,7 +110,7 @@
         <div class="h2-row"><h2>寢室名單</h2><span class="note" id="dRoomCount"></span></div>
         <p class="note">一行一間寢室：先寫寢室號，再寫住在裡面同學的女生隊號或建制隊號。例：5-7 002 003 007 010。寢室號寫「育五7」或「5-7」都可以。每一期各自一份名單。</p>
         <textarea id="dRoomsText" style="min-height:220px" placeholder="5-1 001 002 003 004&#10;5-7 005 006 007 008"></textarea>
-        <div class="d-row"><button type="button" id="dRoomsSave">儲存寢室名單</button></div>
+        <div class="d-row" id="dRoomsBtns"></div>
         <div id="dRoomsInfo"></div>
       </section>
       <section>
@@ -396,6 +396,7 @@
   function renderRooms() {
     const cd = cdata();
     if (document.activeElement !== $("dRoomsText")) $("dRoomsText").value = cd.roomsText;
+    renderRoomsLock();
     roomsInfo();
     $("dAuto").checked = !!data.autoPoints;
     const opts = B.pointsOptions();
@@ -409,6 +410,15 @@
         <label for="dMapReason-${key}">事蹟說明</label><select id="dMapReason-${key}" data-mapreason="${key}"><option value="">請選擇</option>${reasons.map(r => `<option ${r === cur.reason ? "selected" : ""}>${esc(r)}</option>`).join("")}</select></div>`;
     };
     $("dMapping").innerHTML = `<div class="grid">${block("plus", "加分", "優良")}${block("minus", "扣分", "不良")}</div>`;
+  }
+  // 寢室名單存過之後鎖住，避免不小心改到；按「重新輸入寢室名單」才能編輯
+  function renderRoomsLock() {
+    const saved = !!cdata().rooms.length, locked = saved && !roomsEditing, ta = $("dRoomsText");
+    ta.readOnly = locked;
+    ta.classList.toggle("d-locked", locked);
+    $("dRoomsBtns").innerHTML = locked
+      ? `<button type="button" class="secondary" id="dRoomsEdit">重新輸入寢室名單</button><span class="note">寢室名單已儲存並鎖定。</span>`
+      : `<button type="button" id="dRoomsSave">儲存寢室名單</button>` + (saved ? `<button type="button" class="secondary" id="dRoomsCancel">取消</button>` : "");
   }
   function roomsInfo() {
     const {rooms, issues} = D.parseRooms($("dRoomsText").value, index().norm);
@@ -469,6 +479,7 @@
       if (Array.isArray(d.rooms) && d.rooms.length) {
         cd.roomsText = d.rooms.map(r => r.room + " " + r.members.join(" ")).join("\n");
         cd.rooms = D.parseRooms(cd.roomsText, norm).rooms;
+        roomsEditing = false;
       }
       (d.inspectors || []).forEach(n => { if (n && !data.inspectors.includes(n)) data.inspectors.push(n); });
       await flush();
@@ -508,10 +519,12 @@
       if (t.id === "dRoomsSave") {
         const text = $("dRoomsText").value, cd = cdata();
         cd.roomsText = text; cd.rooms = D.parseRooms(text, index().norm).rooms;
-        try { await flush(); msg("dMapMsg", "", ""); roomsInfo(); t.textContent = "已儲存"; setTimeout(() => { t.textContent = "儲存寢室名單"; }, 1500); }
+        try { await flush(); roomsEditing = false; roomsInfo(); renderRoomsLock(); }
         catch (err) { alert("儲存失敗：" + err.message); }
         return;
       }
+      if (t.id === "dRoomsEdit") { roomsEditing = true; renderRoomsLock(); $("dRoomsText").focus(); return; }
+      if (t.id === "dRoomsCancel") { roomsEditing = false; $("dRoomsText").value = cdata().roomsText; roomsInfo(); renderRoomsLock(); return; }
       if (t.id === "dExport") return exportBackup();
       const del = t.closest("[data-del]");
       if (del) {
@@ -561,7 +574,7 @@
       draft = null; month = null; q.from = null; q.room = ""; q.person = "";
       showSub(sub);
     },
-    cohortChanged() { if (!data) return; idxCache = {id: null}; draft = null; month = null; q.room = ""; q.person = ""; if ($("dRaw")) $("dRaw").value = ""; render(); },
+    cohortChanged() { if (!data) return; idxCache = {id: null}; roomsEditing = false; draft = null; month = null; q.room = ""; q.person = ""; if ($("dRaw")) $("dRaw").value = ""; render(); },
     templateChanged() { if (data && sub === "rooms") render(); },
     lock() { data = null; draft = null; if ($("tab-dorm")) $("tab-dorm").innerHTML = ""; },
     flush() { return data ? flush() : Promise.resolve(); }
