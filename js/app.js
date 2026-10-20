@@ -1160,7 +1160,7 @@
     input.value = ""; input.dispatchEvent(new Event("input", {bubbles: true})); input.focus();
   }
   window.clearInput = clearInput;
-  $("pClear").addEventListener("click", () => clearInput($("pIds"), $("pClear")));
+  $("pIdsClear").addEventListener("click", () => clearInput($("pIds"), $("pIdsClear")));
   // 常用狀況面板在「加扣分」和「內務」兩個分頁共用：切換分頁時把面板搬過去，點選的字詞填進該分頁的輸入框
   let quickTarget = "pIds";
   const quickCarets = {};
