@@ -1146,6 +1146,21 @@
   }
   window.pasteInto = pasteInto;
   $("pPaste").addEventListener("click", () => pasteInto($("pIds"), $("pPaste")));
+  // 清空鍵：按一次變「確定清空？」，2 秒內再按一次才清空（避免誤觸）
+  const clearArmed = new WeakMap();
+  function clearInput(input, btn) {
+    if (!input.value) { btn.textContent = "已是空的"; clearTimeout(clearArmed.get(btn)); clearArmed.set(btn, setTimeout(() => { btn.textContent = "清空"; }, 1200)); return; }
+    if (btn.dataset.armed !== "1") {
+      btn.dataset.armed = "1"; btn.textContent = "確定清空？"; btn.classList.add("armed");
+      clearTimeout(clearArmed.get(btn));
+      clearArmed.set(btn, setTimeout(() => { btn.dataset.armed = ""; btn.textContent = "清空"; btn.classList.remove("armed"); }, 2000));
+      return;
+    }
+    clearTimeout(clearArmed.get(btn)); btn.dataset.armed = ""; btn.textContent = "清空"; btn.classList.remove("armed");
+    input.value = ""; input.dispatchEvent(new Event("input", {bubbles: true})); input.focus();
+  }
+  window.clearInput = clearInput;
+  $("pClear").addEventListener("click", () => clearInput($("pIds"), $("pClear")));
   // 常用狀況面板在「加扣分」和「內務」兩個分頁共用：切換分頁時把面板搬過去，點選的字詞填進該分頁的輸入框
   let quickTarget = "pIds";
   const quickCarets = {};

@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>學生加扣分・獎懲登錄</title>
-<link rel="manifest" href="./manifest.webmanifest?v=20261020j">
+<link rel="manifest" href="./manifest.webmanifest?v=20261020k">
 <meta name="theme-color" content="#234e83">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="加扣分獎懲">
-<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261020j">
+<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261020k">
 <style>
 :root{--ink:#1d2939;--muted:#5b6b82;--line:#dce4ef;--bg:#f3f5f9;--card:#fff;--brand:#234e83;--brand-2:#2b5f9e;--soft:#eef4fc;--err:#ae2530;--ok:#127348;--warn:#8a4b08;--cohort:#234e83;font-family:system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;color:var(--ink);background:var(--bg)}
 *{box-sizing:border-box}
@@ -241,6 +241,8 @@ td.cell-actions button.inline-save{background:#127348}
 .copy-btn{display:none;padding:4px 14px;min-height:34px;font-size:14px;margin:0;flex:none}
 .copy-btn.done{background:#e6f4ea;color:#1e6b34}
 .copy-group{display:flex;gap:6px;flex:none}
+.clear-btn{color:#b42318}
+.clear-btn.armed{background:#fde8e6;color:#b42318}
 @media (max-width:1023px){ .copy-btn{display:inline-block} }
 .qp-head{font-size:13px;font-weight:650;color:var(--ink);margin-bottom:6px}
 .qp-head .note{font-weight:400;font-size:12px}
@@ -432,7 +434,7 @@ button.d-small{min-height:36px;padding:6px 12px;font-size:14px;margin:4px 0}
     <section>
       <div class="h2-row"><h2>① 批次登錄</h2><div class="batch-clear"><button type="button" id="pBatchClear" class="danger" disabled>清空紀錄</button><span id="pPrevNote" class="prev-note" role="status" aria-live="polite"></span></div></div>
       <div class="input-cohort">查詢對象：<span class="cohort-tag active-cohort-tag"></span>（只在這一期的名冊中查找）</div>
-      <div class="label-row"><label for="pIds">輸入學生（可多筆）</label><span class="copy-group"><button type="button" id="pCopy" class="copy-btn secondary" aria-label="複製輸入框內容">複製</button><button type="button" id="pPaste" class="copy-btn secondary" aria-label="貼上剪貼簿內容">貼上</button></span></div>
+      <div class="label-row"><label for="pIds">輸入學生（可多筆）</label><span class="copy-group"><button type="button" id="pCopy" class="copy-btn secondary" aria-label="複製輸入框內容">複製</button><button type="button" id="pPaste" class="copy-btn secondary" aria-label="貼上剪貼簿內容">貼上</button><button type="button" id="pClear" class="copy-btn secondary clear-btn" aria-label="清空輸入框">清空</button></span></div>
       <textarea id="pIds" style="min-height:150px" placeholder="例如：002、440000、王小明、011（均為示意）&#10;也可輸入：內務櫃未確實上鎖 002 011"></textarea>
       <div id="pQuick" class="quick-phrases">
         <div class="qp-head"><div>常用狀況　<span class="note">點分類再點項目，文字會填進游標位置；可自行新增、刪除，長按可拖拉調整順序</span></div><button type="button" id="pQuickEditCats" class="qp-edit" aria-pressed="false">編輯分類</button></div>
@@ -640,11 +642,11 @@ button.d-small{min-height:36px;padding:6px 12px;font-size:14px;margin:4px 0}
 })();
 </script>
 <script defer src="./vendor/xlsx.full.min.js?v=0.20.3"></script>
-<script defer src="./js/core.js?v=20261020j"></script>
-<script defer src="./js/store.js?v=20261020j"></script>
-<script defer src="./js/dorm-core.js?v=20261020j"></script>
-<script defer src="./js/dorm.js?v=20261020j"></script>
-<script defer src="./js/app.js?v=20261020j"></script>
+<script defer src="./js/core.js?v=20261020k"></script>
+<script defer src="./js/store.js?v=20261020k"></script>
+<script defer src="./js/dorm-core.js?v=20261020k"></script>
+<script defer src="./js/dorm.js?v=20261020k"></script>
+<script defer src="./js/app.js?v=20261020k"></script>
 <script>if ("serviceWorker" in navigator && location.protocol === "https:") window.addEventListener("load", function () { navigator.serviceWorker.register("./sw.js").catch(function () {}); });</script>
 </body>
 </html>
