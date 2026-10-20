@@ -846,7 +846,8 @@
     const saved = settings.quickPhrases && settings.quickPhrases[cat];
     return Array.isArray(saved) ? saved : (QUICK_DEFAULTS.find(([name]) => name === cat) || [, []])[1];
   };
-  const BUILTIN_CATS = QUICK_DEFAULTS.map(([cat]) => cat).concat(QUICK_DIRECT);
+  // 預設順序：「自訂」→「公物」→ 其他內建分類
+  const BUILTIN_CATS = [QUICK_DEFAULTS[0][0]].concat(QUICK_DIRECT, QUICK_DEFAULTS.slice(1).map(([cat]) => cat));
   const customCats = () => Array.isArray(settings.quickCustomCats) ? settings.quickCustomCats : [];
   const hiddenCats = () => Array.isArray(settings.quickHiddenCats) ? settings.quickHiddenCats : [];
   /** 內建內務分類才自動帶入扣分事由；「自訂」與自己新增的分類不帶入 */
@@ -855,6 +856,12 @@
   function quickCatList() {
     const hidden = hiddenCats();
     const names = BUILTIN_CATS.concat(customCats()).filter(cat => !hidden.includes(cat));
+    // 一次性調整：已自訂過排序的，也把「公物」移到「自訂」正右邊
+    if (Array.isArray(settings.quickCatOrder) && !settings.quickGongwuNext) {
+      const o = settings.quickCatOrder.filter(cat => !QUICK_DIRECT.includes(cat)), at = o.indexOf(QUICK_CUSTOM);
+      o.splice(at < 0 ? 0 : at + 1, 0, ...QUICK_DIRECT);
+      settings.quickCatOrder = o; settings.quickGongwuNext = true; saveSettings();
+    }
     const saved = Array.isArray(settings.quickCatOrder) ? settings.quickCatOrder.filter(cat => names.includes(cat)) : [];
     return saved.concat(names.filter(cat => !saved.includes(cat)));
   }
@@ -1121,6 +1128,24 @@
     else { btn.textContent = "無法複製"; btn.classList.remove("done"); }
     copyTimer = setTimeout(() => { btn.textContent = "複製"; btn.classList.remove("done"); }, 1800);
   });
+  // 貼上鍵：把剪貼簿內容貼到游標處（沒有游標就接在最後）
+  let pasteTimer = null;
+  async function pasteInto(input, btn) {
+    const done = (label, ok) => { clearTimeout(pasteTimer); btn.textContent = label; btn.classList.toggle("done", !!ok); pasteTimer = setTimeout(() => { btn.textContent = "貼上"; btn.classList.remove("done"); }, 1800); };
+    let text = "";
+    try { if (navigator.clipboard && navigator.clipboard.readText) text = await navigator.clipboard.readText(); else throw new Error("no clipboard"); }
+    catch (error) { input.focus(); done("請長按輸入框貼上"); return; }
+    if (!text) { done("剪貼簿是空的"); return; }
+    const v = input.value, focused = document.activeElement === input;
+    const start = focused ? input.selectionStart : v.length, end = focused ? input.selectionEnd : v.length;
+    const ins = !focused && v && !/\n$/.test(v) ? "\n" + text : text;
+    input.value = v.slice(0, start) + ins + v.slice(end);
+    const pos = start + ins.length; input.focus(); try { input.setSelectionRange(pos, pos); } catch (error) { /* 部分瀏覽器不支援 */ }
+    input.dispatchEvent(new Event("input", {bubbles: true}));
+    done("已貼上 ✓", true);
+  }
+  window.pasteInto = pasteInto;
+  $("pPaste").addEventListener("click", () => pasteInto($("pIds"), $("pPaste")));
   // 常用狀況面板在「加扣分」和「內務」兩個分頁共用：切換分頁時把面板搬過去，點選的字詞填進該分頁的輸入框
   let quickTarget = "pIds";
   const quickCarets = {};

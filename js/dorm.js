@@ -55,7 +55,7 @@
 
     <div data-pane="entry">
       <section>
-        <div class="label-row"><h2 style="margin:0">貼上內務公告</h2><button type="button" id="dRawCopy" class="copy-btn secondary" aria-label="複製公告內容">複製</button></div>
+        <div class="label-row"><h2 style="margin:0">貼上內務公告</h2><span class="copy-group"><button type="button" id="dRawCopy" class="copy-btn secondary" aria-label="複製公告內容">複製</button><button type="button" id="dRawPaste" class="copy-btn secondary" aria-label="貼上剪貼簿內容">貼上</button></span></div>
         <div class="input-cohort">對象：<span class="cohort-tag active-cohort-tag"></span>（用這一期的名冊辨識女生隊號、建制隊號）</div>
         <textarea id="dRaw" style="min-height:180px" placeholder="把 LINE 上的內務檢查公告整則貼上，例如：&#10;1151019內務檢查&#10;被優：002 003&#10;棉被不潔 088 444194&#10;公物&#10;窗溝不潔 育五7、6-2"></textarea>
         <div id="dQuickSlot"></div>
@@ -622,6 +622,7 @@
       const pi = t.closest("[data-pickinsp]"); if (pi) { $("dInsp").value = pi.dataset.pickinsp; renderDraft(); return; }
       const f = t.closest("[data-flip]"); if (f && draft) { const it = draft.items[+f.dataset.flip]; it.sign *= -1; renderDraft(); return; }
       if (t.id === "dRawCopy") { copyRaw(t); return; }
+      if (t.id === "dRawPaste") { if (window.pasteInto) window.pasteInto($("dRaw"), t); return; }
       if (t.id === "dSaveBtn") return saveDraft(false);
       if (t.id === "dSaveNew") return saveDraft("new");
       const rp = t.closest("[data-replace]"); if (rp) return saveDraft(rp.dataset.replace);
