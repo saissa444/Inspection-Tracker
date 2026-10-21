@@ -49,7 +49,7 @@
   function skeleton() {
     $("tab-dorm").innerHTML = `
     <nav class="d-subtabs" role="tablist" aria-label="內務功能">
-      <button type="button" data-sub="entry">登錄公告</button><button type="button" data-sub="stats">月統計</button><button type="button" data-sub="query">明細查詢</button><button type="button" data-sub="history">檢查紀錄</button><button type="button" data-sub="rooms">寢室名單與設定</button>
+      <button type="button" data-sub="entry">登錄公告</button><button type="button" data-sub="stats">月統計</button><button type="button" data-sub="query">明細查詢</button><button type="button" data-sub="history">檢查紀錄</button><button type="button" data-sub="rooms">寢室名單與設定</button><button type="button" data-sub="backup">備份與匯入</button>
     </nav>
     <div id="dNoCohort" class="status warning" hidden>請先到「名冊與設定」匯入名冊並選擇目前期別。</div>
 
@@ -122,6 +122,9 @@
         <div id="dMapping"></div>
         <div id="dMapMsg" class="status" hidden></div>
       </section>
+    </div>
+
+    <div data-pane="backup" hidden>
       <section>
         <h2>備份與匯入</h2>
         <p class="note">可以把這一期的寢室名單和檢查紀錄存成備份檔，或匯入線上版內務統計匯出的資料。</p>
