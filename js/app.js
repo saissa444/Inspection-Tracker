@@ -85,7 +85,9 @@
   const saveCohorts = () => Store.setJSON("cohorts", cohorts);
 
   function download(bytes, filename) {
-    const url = URL.createObjectURL(new Blob([bytes], {type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
+    // 依副檔名給正確的檔案類型（手機 Safari 會依類型決定怎麼存檔）
+    const type = /\.json$/i.test(filename) ? "application/json" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const url = URL.createObjectURL(new Blob([bytes], {type}));
     const a = document.createElement("a");
     a.href = url; a.download = filename; a.rel = "noopener";
     a.style.display = "none";
