@@ -151,6 +151,122 @@
     $("unlockBtn").disabled = false;
   });
 
+  /* ═══════════ 全部資料備份：一個檔案帶走名冊、範本、加扣分、獎懲、內務與設定 ═══════════ */
+  const b64 = bytes => { let s = ""; const u = new Uint8Array(bytes); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
+  const unb64 = text => Uint8Array.from(atob(text), c => c.charCodeAt(0));
+  const escHtml = t => String(t).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;"}[c]));
+  const recKey = r => JSON.stringify(r);
+  function fullMsg(html, kind) { const box = $("fullRestoreAsk"); box.hidden = false; box.className = "restore-ask" + (kind ? " " + kind : ""); box.innerHTML = html; }
+  const dormReportCount = dorm => Object.values((dorm && dorm.byCohort) || {}).reduce((n, c) => n + Object.keys(c.reports || {}).length, 0);
+  function backupSummary(d) {
+    return [(d.cohorts || []).length + " 期名冊", "加扣分 " + ((d.drafts || {}).points || []).length + " 筆", "獎懲 " + ((d.drafts || {}).reward || []).length + " 筆",
+      "內務檢查 " + dormReportCount(d.dorm) + " 次", "範本 " + ["points", "reward"].filter(k => d.templates && d.templates[k]).length + " 份"].join("、");
+  }
+  async function buildFullBackup() {
+    await flushDrafts();
+    const tpl = {};
+    for (const kind of ["points", "reward"]) {
+      const meta = await Store.getJSON("tpl-" + kind, null), bytes = await Store.getBytes("tpl-" + kind);
+      if (meta && bytes) tpl[kind] = {meta, bytes: b64(bytes)};
+    }
+    return {app: "學生加扣分", type: "full-backup", version: 1, exportedAt: new Date().toISOString(),
+      cohorts, settings, templates: tpl, drafts: {points: pRecords, reward: rRecords}, dorm: await Store.getJSON("dorm", {})};
+  }
+  $("fullBackup").addEventListener("click", async () => {
+    try {
+      const d = await buildFullBackup();
+      download(new TextEncoder().encode(JSON.stringify(d)), "全部資料備份_" + stampDash() + ".json");
+      fullMsg("已下載備份檔（" + escHtml(backupSummary(d)) + "）。到另一台裝置按「匯入全部資料備份」選這個檔案即可。", "ok");
+    } catch (error) { fullMsg("備份失敗：" + escHtml(error.message), "error"); }
+  });
+  /** 合併：名冊依期別名稱對應；紀錄去除完全相同的；內務同一次檢查保留較新的版本；這台已有的範本與設定不變 */
+  function mergeBackup(local, bk) {
+    const out = {cohorts: local.cohorts.slice(), settings: local.settings, templates: {}, drafts: {}, dorm: null};
+    const idMap = {};
+    (bk.cohorts || []).forEach(c => {
+      const same = out.cohorts.find(x => x.id === c.id) || out.cohorts.find(x => x.label === c.label);
+      if (same) idMap[c.id] = same.id; else { out.cohorts.push(c); idMap[c.id] = c.id; }
+    });
+    const fixSrc = r => { const m = /^dorm:([^:]+):(.*)$/.exec(r.src || ""); return m && idMap[m[1]] && idMap[m[1]] !== m[1] ? Object.assign({}, r, {src: "dorm:" + idMap[m[1]] + ":" + m[2]}) : r; };
+    ["points", "reward"].forEach(k => {
+      const mine = local.drafts[k], have = new Set(mine.map(recKey));
+      out.drafts[k] = mine.concat(((bk.drafts || {})[k] || []).map(fixSrc).filter(r => !have.has(recKey(r)) && have.add(recKey(r))));
+      out.templates[k] = local.templates[k] || (bk.templates || {})[k] || null;
+    });
+    if (!local.settings.quickPhrases && !local.settings.quickCatOrder && bk.settings) {
+      out.settings = Object.assign({}, local.settings);
+      ["quickPhrases", "quickCatOrder", "quickHiddenCats", "quickCustomCats", "quickGongwuNext"].forEach(k => { if (k in bk.settings) out.settings[k] = bk.settings[k]; });
+    }
+    const ld = Object.assign({mapping: null, autoPoints: true, inspectors: [], byCohort: {}}, local.dorm), bd = Object.assign({inspectors: [], byCohort: {}}, bk.dorm);
+    const dorm = Object.assign({}, ld, {mapping: ld.mapping || bd.mapping || null, inspectors: ld.inspectors.concat(bd.inspectors.filter(n => !ld.inspectors.includes(n))), byCohort: Object.assign({}, ld.byCohort)});
+    Object.entries(bd.byCohort).forEach(([cid, c]) => {
+      const id = idMap[cid] || cid, mine = dorm.byCohort[id] || {roomsText: "", rooms: [], reports: {}};
+      const reports = Object.assign({}, mine.reports);
+      Object.entries(c.reports || {}).forEach(([rid, r]) => {
+        const old = reports[rid], t = x => String(x.updatedAt || x.savedAt || "");
+        if (!old || t(r) > t(old)) reports[rid] = r;
+      });
+      dorm.byCohort[id] = Object.assign({}, mine, mine.rooms && mine.rooms.length ? {} : {roomsText: c.roomsText || "", rooms: c.rooms || []}, {reports});
+    });
+    out.dorm = dorm;
+    return out;
+  }
+  async function applyBackup(next) {
+    clearTimeout(saveTimer); saveTimer = null;
+    await Store.setJSON("cohorts", next.cohorts);
+    await Store.setJSON("settings", next.settings);
+    for (const kind of ["points", "reward"]) {
+      const t = next.templates[kind];
+      if (t && t.meta && t.bytes) { await Store.setJSON("tpl-" + kind, t.meta); await Store.setBytes("tpl-" + kind, typeof t.bytes === "string" ? unb64(t.bytes) : t.bytes); }
+      else if (!t) { await Store.remove("tpl-" + kind); }
+    }
+    await Store.setJSON("drafts", {points: next.drafts.points || [], reward: next.drafts.reward || []});
+    await Store.setJSON("dorm", next.dorm || {});
+    settings = {activeCohort: "", autoLockMinutes: 15, tab: settings.tab};
+    pSelected.clear(); pInline = null;
+    await enterApp(false);
+    showTab("backup");
+  }
+  $("fullRestore").addEventListener("change", async e => {
+    const file = e.target.files[0]; e.target.value = "";
+    if (!file) return;
+    let bk;
+    try {
+      bk = JSON.parse(new TextDecoder().decode(await readFile(file)));
+      if (!bk || bk.type !== "full-backup") throw new Error(bk && bk.app === "內務統計" ? "這是內務備份檔，請到「內務 › 備份與匯入」匯入。" : "這不是全部資料備份檔。");
+    } catch (error) { fullMsg("匯入失敗：" + escHtml(error.message), "error"); return; }
+    await flushDrafts();
+    const tplLocal = {};
+    for (const kind of ["points", "reward"]) {
+      const meta = await Store.getJSON("tpl-" + kind, null), bytes = await Store.getBytes("tpl-" + kind);
+      tplLocal[kind] = meta && bytes ? {meta, bytes} : null;
+    }
+    const local = {cohorts, settings, templates: tplLocal, drafts: {points: pRecords, reward: rRecords}, dorm: await Store.getJSON("dorm", {})};
+    const empty = !cohorts.length && !pRecords.length && !rRecords.length && !dormReportCount(local.dorm);
+    const run = async mode => {
+      try {
+        const next = mode === "replace" ? {cohorts: bk.cohorts || [], settings: Object.assign({}, bk.settings || {}), templates: bk.templates || {}, drafts: bk.drafts || {}, dorm: bk.dorm || {}} : mergeBackup(local, bk);
+        if (mode === "replace" && local.templates.points && !next.templates.points) next.templates.points = local.templates.points;
+        if (mode === "replace" && local.templates.reward && !next.templates.reward) next.templates.reward = local.templates.reward;
+        await applyBackup(next);
+        fullMsg((mode === "replace" ? "已用備份取代這台的資料。" : "已合併備份。") + "目前：" + escHtml(backupSummary({cohorts, drafts: {points: pRecords, reward: rRecords}, dorm: await Store.getJSON("dorm", {}), templates: {points: pTpl, reward: rTpl}})) + "。", "ok");
+      } catch (error) { fullMsg("匯入失敗：" + escHtml(error.message), "error"); }
+    };
+    if (empty) { await run("replace"); return; }
+    fullMsg("<p>備份檔（" + (bk.exportedAt ? fmtDate(bk.exportedAt) + " 備份，" : "") + escHtml(backupSummary(bk)) + "）。這台裝置已經有資料，要怎麼處理？</p>" +
+      '<div class="actions"><button type="button" data-full="merge">合併到這台（建議）</button>' +
+      '<button type="button" class="secondary" data-full="replace">整個取代成備份內容</button>' +
+      '<button type="button" class="secondary" data-full="cancel">取消</button></div>' +
+      '<p class="note">合併：名冊、紀錄、內務檢查都加進來，相同的不會重複；這台已有的範本和設定不變。取代：這台目前的名冊、紀錄、內務資料和設定都換成備份內容。</p>');
+    $("fullRestoreAsk").onclick = async ev => {
+      const b = ev.target.closest("[data-full]"); if (!b) return;
+      if (b.dataset.full === "cancel") { $("fullRestoreAsk").onclick = null; $("fullRestoreAsk").hidden = true; return; }
+      if (b.dataset.full === "replace" && !confirm("確定用備份取代這台裝置目前的資料？目前的名冊、紀錄和內務資料會被換掉。")) return;
+      $("fullRestoreAsk").onclick = null;
+      await run(b.dataset.full);
+    };
+  });
+
   async function wipeEverything() {
     if (!confirm("確定清除這台裝置上本 App 的全部資料？\n（名冊、範本、尚未匯出的紀錄、密碼設定都會刪除，無法復原）")) return;
     if (!confirm("再次確認：真的要清除嗎？")) return;
@@ -449,7 +565,7 @@
   });
 
   function showTab(tab) {
-    ["dorm", "points", "reward", "settings"].forEach(name => {
+    ["dorm", "points", "reward", "settings", "backup"].forEach(name => {
       $("tab-" + name).hidden = name !== tab;
       $("tabBtn-" + name).setAttribute("aria-selected", String(name === tab));
     });

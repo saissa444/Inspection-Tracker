@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>學生加扣分・獎懲登錄</title>
-<link rel="manifest" href="./manifest.webmanifest?v=20261021c">
+<link rel="manifest" href="./manifest.webmanifest?v=20261022c">
 <meta name="theme-color" content="#234e83">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="加扣分獎懲">
-<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261021c">
+<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261022c">
 <style>
 :root{--ink:#1d2939;--muted:#5b6b82;--line:#dce4ef;--bg:#f3f5f9;--card:#fff;--brand:#234e83;--brand-2:#2b5f9e;--soft:#eef4fc;--err:#ae2530;--ok:#127348;--warn:#8a4b08;--cohort:#234e83;font-family:system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;color:var(--ink);background:var(--bg)}
 *{box-sizing:border-box}
@@ -241,6 +241,11 @@ td.cell-actions button.inline-save{background:#127348}
 .copy-btn{display:none;padding:4px 14px;min-height:34px;font-size:14px;margin:0;flex:none}
 .copy-btn.done{background:#e6f4ea;color:#1e6b34}
 .copy-group{display:flex;gap:6px;flex:none}
+.backup-box{margin-top:14px;padding-top:6px;border-top:1px dashed var(--line)}
+.restore-ask{margin:8px 0;padding:10px 12px;border-radius:10px;background:#eef4fb;border:1px solid #c9d8ec}
+.restore-ask p{margin:0 0 6px}
+.restore-ask.ok{background:#e6f4ea;border-color:#b7dfc3;color:#1e6b34}
+.restore-ask.error{background:#fde8e6;border-color:#f3c1bb;color:#b42318}
 .clear-btn{color:#b42318}
 .clear-btn.armed{background:#fde8e6;color:#b42318}
 @media (max-width:1023px){ .copy-btn{display:inline-block} }
@@ -423,6 +428,7 @@ button.d-small{min-height:36px;padding:6px 12px;font-size:14px;margin:4px 0}
     <button class="tab" role="tab" id="tabBtn-points" aria-controls="tab-points" data-tab="points">加扣分<span class="count" id="pTabCount"></span></button>
     <button class="tab" role="tab" id="tabBtn-reward" aria-controls="tab-reward" data-tab="reward">獎懲<span class="count" id="rTabCount"></span></button>
     <button class="tab" role="tab" id="tabBtn-settings" aria-controls="tab-settings" data-tab="settings">名冊與設定</button>
+    <button class="tab" role="tab" id="tabBtn-backup" aria-controls="tab-backup" data-tab="backup">備份</button>
   </nav>
 
   <main>
@@ -484,6 +490,7 @@ button.d-small{min-height:36px;padding:6px 12px;font-size:14px;margin:4px 0}
         <button id="pExport" type="button" disabled>下載學校格式 Excel (.xlsx)</button>
         <button id="pClear" type="button" class="secondary" disabled>清空紀錄</button>
       </div>
+      <p class="note">換電腦或改用單機版時，請到「備份」分頁下載一個備份檔，再到另一台匯入，加扣分、獎懲、內務紀錄和名冊都會一起帶過去。</p>
       <p class="note">尚未匯出的紀錄也會加密保存在本機，重新開啟後仍在。匯出以學校範本為底，只改寫「工作表1」的資料列，其餘格式不變；兩期學生可放在同一份檔案。正式匯入學校系統前請再檢查一次。</p>
     </section>
   </div>
@@ -620,6 +627,20 @@ button.d-small{min-height:36px;padding:6px 12px;font-size:14px;margin:4px 0}
     </section>
     <p class="note" style="text-align:center">版本 2026.10.19n</p>
   </div>
+
+  <!-- ═════════ 備份 ═════════ -->
+  <div id="tab-backup" class="tabpanel" role="tabpanel" aria-labelledby="tabBtn-backup" hidden>
+    <section>
+      <h2>全部資料備份</h2>
+      <p class="note">把這台裝置上 App 的<strong>全部資料</strong>存成一個備份檔：期別名冊、學校範本、尚未匯出的加扣分與獎懲紀錄、內務寢室名單與檢查紀錄、常用狀況等設定。換電腦或改用單機版時，先在原本的地方下載，再到另一台按「匯入全部資料備份」即可。</p>
+      <div class="actions">
+        <button id="fullBackup" type="button">下載全部資料備份 (.json)</button>
+        <label class="button secondary">匯入全部資料備份<input type="file" id="fullRestore" accept=".json,application/json" hidden></label>
+      </div>
+      <div id="fullRestoreAsk" class="restore-ask" hidden></div>
+      <p class="note">⚠️ 備份檔沒有加密，裡面有學生的隊號、姓名與學籍號碼，請存在自己的隨身碟或雲端，不要傳到公開的地方或上傳到 GitHub。</p>
+    </section>
+  </div>
   </main>
 </div>
 
@@ -642,11 +663,11 @@ button.d-small{min-height:36px;padding:6px 12px;font-size:14px;margin:4px 0}
 })();
 </script>
 <script defer src="./vendor/xlsx.full.min.js?v=0.20.3"></script>
-<script defer src="./js/core.js?v=20261021c"></script>
-<script defer src="./js/store.js?v=20261021c"></script>
-<script defer src="./js/dorm-core.js?v=20261021c"></script>
-<script defer src="./js/dorm.js?v=20261021c"></script>
-<script defer src="./js/app.js?v=20261021c"></script>
+<script defer src="./js/core.js?v=20261022c"></script>
+<script defer src="./js/store.js?v=20261022c"></script>
+<script defer src="./js/dorm-core.js?v=20261022c"></script>
+<script defer src="./js/dorm.js?v=20261022c"></script>
+<script defer src="./js/app.js?v=20261022c"></script>
 <script>if ("serviceWorker" in navigator && location.protocol === "https:") window.addEventListener("load", function () { navigator.serviceWorker.register("./sw.js").catch(function () {}); });</script>
 </body>
 </html>

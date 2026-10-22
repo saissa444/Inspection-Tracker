@@ -49,7 +49,7 @@
   function skeleton() {
     $("tab-dorm").innerHTML = `
     <nav class="d-subtabs" role="tablist" aria-label="內務功能">
-      <button type="button" data-sub="entry">登錄公告</button><button type="button" data-sub="history">檢查紀錄</button><button type="button" data-sub="query">明細查詢</button><button type="button" data-sub="stats">月統計</button><button type="button" data-sub="rooms">寢室名單與設定</button><button type="button" data-sub="backup">備份與匯入</button>
+      <button type="button" data-sub="entry">登錄公告</button><button type="button" data-sub="history">檢查紀錄</button><button type="button" data-sub="query">明細查詢</button><button type="button" data-sub="stats">月統計</button><button type="button" data-sub="rooms">寢室名單與設定</button>
     </nav>
     <div id="dNoCohort" class="status warning" hidden>請先到「名冊與設定」匯入名冊並選擇目前期別。</div>
 
@@ -121,18 +121,6 @@
         <label class="check-label"><input type="checkbox" id="dAuto"> 儲存內務檢查時，自動轉入加扣分</label>
         <div id="dMapping"></div>
         <div id="dMapMsg" class="status" hidden></div>
-      </section>
-    </div>
-
-    <div data-pane="backup" hidden>
-      <section>
-        <h2>備份與匯入</h2>
-        <p class="note">可以把這一期的寢室名單和檢查紀錄存成備份檔，或匯入線上版內務統計匯出的資料。</p>
-        <div class="d-row">
-          <button type="button" id="dExport" class="secondary">下載內務備份</button>
-          <label class="button secondary d-filebtn">匯入內務資料<input type="file" id="dImport" accept=".json,application/json" hidden></label>
-        </div>
-        <div id="dImportMsg" class="status" hidden></div>
       </section>
     </div>
 
@@ -466,51 +454,6 @@
     $("dInspList").innerHTML = data.inspectors.map(n => `<option value="${esc(n)}"></option>`).join("");
   }
 
-  /* ═════ 備份與匯入 ═════ */
-  function exportBackup() {
-    const c = cohort(), cd = cdata();
-    const toNum = k => { const s = stu(k); return s ? (s.female || s.team) : k; };
-    const out = {app: "內務統計", version: 1, cohort: c.label, exportedAt: new Date().toISOString(),
-      rooms: cd.rooms.map(r => ({room: r.room, members: r.members.map(toNum)})),
-      reports: Object.entries(cd.reports).map(([id, r]) => Object.assign({}, r, {id, items: r.items.map(it => Object.assign({}, it, {
-        targets: it.scope === "p" ? it.targets.map(toNum) : it.targets,
-        notes: Object.fromEntries(Object.entries(it.notes || {}).map(([k, v]) => [it.scope === "p" ? toNum(k) : k, v]))}))})),
-      inspectors: data.inspectors};
-    const bytes = new TextEncoder().encode(JSON.stringify(out, null, 1));
-    B.download(bytes, "內務備份_" + c.label + "_" + D.todayStr() + ".json");
-  }
-  /** 匯入的資料用女生隊號／建制隊號記人，依目前這一期的名冊換成學籍號碼。 */
-  async function importBackup(file) {
-    try {
-      const d = JSON.parse(await file.text());
-      if (!Array.isArray(d.reports)) throw new Error("這不是內務資料檔。");
-      const norm = index().norm, cd = cdata(), miss = new Set();
-      const conv = t => { const k = norm(String(t)); if (!k || k[0] === "?") { miss.add(String(t)); return null; } return k; };
-      let added = 0, replaced = 0;
-      for (const r of d.reports) {
-        if (!r.date) continue;
-        const items = (r.items || []).map(it => {
-          const notes = {};
-          const targets = it.scope === "p" ? it.targets.map(t => { const k = conv(t); if (k && it.notes && it.notes[t]) notes[k] = it.notes[t]; return k; }).filter(Boolean) : it.targets.slice();
-          if (it.scope !== "p") Object.assign(notes, it.notes || {});
-          return {scope: it.scope, item: it.item, sign: it.sign, targets, notes};
-        });
-        const key = r.id || r.date;
-        if (cd.reports[key]) replaced++; else added++;
-        cd.reports[key] = {date: r.date, inspector: r.inspector || "", raw: r.raw || "", savedAt: r.savedAt || new Date().toISOString(), items};
-      }
-      if (Array.isArray(d.rooms) && d.rooms.length) {
-        cd.roomsText = d.rooms.map(r => r.room + " " + r.members.join(" ")).join("\n");
-        cd.rooms = D.parseRooms(cd.roomsText, norm).rooms;
-        roomsEditing = false;
-      }
-      (d.inspectors || []).forEach(n => { if (n && !data.inspectors.includes(n)) data.inspectors.push(n); });
-      await flush();
-      msg("dImportMsg", `已匯入 ${added + replaced} 次檢查（新增 ${added}、取代 ${replaced}）` + (d.rooms && d.rooms.length ? `和 ${d.rooms.length} 間寢室名單` : "") + "。匯入的舊資料不會轉入加扣分。" + (miss.size ? `這一期名冊找不到的號碼已略過：${Array.from(miss).slice(0, 20).join("、")}` : ""), miss.size ? "warning" : "ok");
-      renderRooms();
-    } catch (e) { msg("dImportMsg", "匯入失敗：" + e.message, "error"); }
-  }
-
   // 複製公告框內容（和加扣分「輸入學生」旁的複製鍵一樣，方便貼到 LINE）
   let copyTimer = null;
   async function copyRaw(btn) {
@@ -659,7 +602,6 @@
       }
       if (t.id === "dRoomsEdit") { roomsEditing = true; renderRoomsLock(); $("dRoomsText").focus(); return; }
       if (t.id === "dRoomsCancel") { roomsEditing = false; $("dRoomsText").value = cdata().roomsText; roomsInfo(); renderRoomsLock(); return; }
-      if (t.id === "dExport") return exportBackup();
       const del = t.closest("[data-del]");
       if (del) {
         const id = del.dataset.del, r = cdata().reports[id], src = srcOf(id), n = B.countPoints(src);
@@ -687,7 +629,6 @@
         if (r.inspector && !data.inspectors.includes(r.inspector)) data.inspectors.push(r.inspector);
         save();
       }
-      if (t.id === "dImport" && t.files[0]) { importBackup(t.files[0]); t.value = ""; }
     });
     let rawTimer, personTimer;
     root.addEventListener("input", e => {
