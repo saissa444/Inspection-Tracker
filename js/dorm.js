@@ -51,7 +51,7 @@
     <nav class="d-subtabs" role="tablist" aria-label="內務功能">
       <button type="button" data-sub="entry">登錄公告</button><button type="button" data-sub="history">檢查紀錄</button><button type="button" data-sub="query">明細查詢</button><button type="button" data-sub="stats">月統計</button><button type="button" data-sub="rooms">寢室名單與設定</button>
     </nav>
-    <div id="dNoCohort" class="status warning" hidden>請先到「名冊與設定」匯入名冊並選擇目前期別。</div>
+    <div id="dNoCohort" class="status warning" hidden>請先到「名冊」匯入名冊並選擇目前期別。</div>
 
     <div data-pane="entry">
       <section>
@@ -411,7 +411,7 @@
     roomsInfo();
     $("dAuto").checked = !!data.autoPoints;
     const opts = B.pointsOptions();
-    if (!opts) { $("dMapping").innerHTML = `<div class="status warning">還沒匯入加扣分範本。請先到「名冊與設定」匯入，才能選擇事蹟說明。</div>`; return; }
+    if (!opts) { $("dMapping").innerHTML = `<div class="status warning">還沒匯入加扣分範本。請先到「名冊」匯入，才能選擇事蹟說明。</div>`; return; }
     if (!data.mapping) { data.mapping = D.guessMapping(opts); save(); }
     const block = (key, kind, prefix) => {
       const cur = data.mapping[key] || {}, cats = Object.keys(opts).filter(c => c.startsWith(prefix));

@@ -822,7 +822,7 @@
     panel.replaceChildren();
     const cohort = activeCohort();
     if (!core.clean(value)) { panel.textContent = "尚未輸入學生資料"; return null; }
-    if (!cohort) { panel.textContent = "請先到「名冊與設定」匯入名冊。"; panel.classList.add("err"); return null; }
+    if (!cohort) { panel.textContent = "請先到「名冊」匯入名冊。"; panel.classList.add("err"); return null; }
     panel.classList.remove("err");
     try {
       const resolved = core.resolveStudents(value, cohort.students, otherCohorts());
@@ -1429,7 +1429,7 @@
     if (rerender) pRenderRecords();
   }
   function pStartInline(r) {
-    if (!pTpl) { alert("請先到「名冊與設定」匯入加扣分範本才能編輯。"); return; }
+    if (!pTpl) { alert("請先到「名冊」匯入加扣分範本才能編輯。"); return; }
     if (pInline) pCancelInline();
     const targets = pSelected.size > 1 && pSelected.has(r) ? pRecords.filter(x => pSelected.has(x)) : [r];
     // 勾選的各筆原值不同的欄位，顯示「多個值」：要改就重新選，不動就保留各筆原值
@@ -1723,7 +1723,7 @@
   $("pExport").addEventListener("click", () => {
     const out = $("pError");
     try {
-      if (!pTpl) throw new Error("請先到「名冊與設定」匯入加扣分範本");
+      if (!pTpl) throw new Error("請先到「名冊」匯入加扣分範本");
       if (!pRecords.length) throw new Error("尚無紀錄");
       const bytes = core.exportPointsWorkbook(pTpl.bytes, pRecords, X, window);
       download(bytes, "加扣分APP匯入_" + stampDash() + ".xlsx");
@@ -1905,7 +1905,7 @@
   });
   $("rExport").addEventListener("click", () => {
     try {
-      if (!rTpl) throw new Error("請先到「名冊與設定」匯入獎懲範本");
+      if (!rTpl) throw new Error("請先到「名冊」匯入獎懲範本");
       const workbook = core.exportRewardWorkbook(rRecords, rT(), X);
       const bytes = X.write(workbook, {bookType: "xlsx", type: "array"});
       download(bytes, "獎懲紀錄_" + stampDash().replace(/-/g, "") + ".xlsx");
@@ -1925,7 +1925,7 @@
     if (rerender) rRender();
   }
   function rStartInline(index) {
-    if (!rTpl) { alert("請先到「名冊與設定」匯入獎懲範本才能編輯。"); return; }
+    if (!rTpl) { alert("請先到「名冊」匯入獎懲範本才能編輯。"); return; }
     if (rInline) rCancelInline();
     const r = rRecords[index]; if (!r) return;
     const t = rT();
