@@ -5,6 +5,9 @@
   if (!core || !Store || !X || !X.read || !X.CFB) { window.reportStartupError("程式元件未完整載入，請重新整理網頁。"); return; }
 
   const COLORS = ["#1f5fae", "#c2410c", "#15803d", "#7c3aed", "#be185d", "#0f766e"];
+  // 畫面顯示用的莫蘭迪色；儲存的期別顏色維持原值，舊資料不必轉換
+  const MORANDI = {"#1f5fae": "#5a7391", "#c2410c": "#a0684f", "#15803d": "#647a61", "#7c3aed": "#776a89", "#be185d": "#9a6472", "#0f766e": "#5a7a76"};
+  const tone = color => MORANDI[color] || color;
   const SCORES = ["0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8"];
 
   /* ───────── 狀態 ───────── */
@@ -20,7 +23,7 @@
   const stampDash = () => new Date().toLocaleDateString("sv-SE");
   const activeCohort = () => cohorts.find(c => c.id === settings.activeCohort) || null;
   const otherCohorts = () => cohorts.filter(c => c.id !== settings.activeCohort);
-  const colorOf = label => { const c = cohorts.find(c => c.label === label); return c ? c.color : "#64748b"; };
+  const colorOf = label => { const c = cohorts.find(c => c.label === label); return c ? tone(c.color) : "#7d7a75"; };
   function cohortTag(label) {
     const span = document.createElement("span");
     span.className = "cohort-tag"; span.textContent = label || "—"; span.style.setProperty("--c", colorOf(label));
@@ -602,14 +605,14 @@
 
   function renderCohorts() {
     const active = activeCohort();
-    document.documentElement.style.setProperty("--cohort", active ? active.color : "#ae2530");
+    document.documentElement.style.setProperty("--cohort", active ? tone(active.color) : "#9c5454");
     const box = $("cohortButtons");
     box.replaceChildren();
     cohorts.forEach(cohort => {
       const button = document.createElement("button");
       button.type = "button"; button.className = "cohort-btn"; button.setAttribute("role", "radio");
       button.setAttribute("aria-checked", String(cohort.id === settings.activeCohort));
-      button.style.setProperty("--c", cohort.color);
+      button.style.setProperty("--c", tone(cohort.color));
       button.textContent = cohort.label;
       const small = document.createElement("small"); small.textContent = cohort.students.length + " 人";
       button.append(small);
@@ -619,7 +622,7 @@
     $("cohortEmpty").hidden = cohorts.length > 0;
     document.querySelectorAll(".active-cohort-tag").forEach(tag => {
       tag.textContent = active ? active.label : "尚未選擇期別";
-      tag.style.setProperty("--c", active ? active.color : "#ae2530");
+      tag.style.setProperty("--c", active ? tone(active.color) : "#9c5454");
     });
 
     const list = $("cohortList");
@@ -630,7 +633,7 @@
     }
     cohorts.forEach(cohort => {
       const card = document.createElement("div");
-      card.className = "cohort-card"; card.style.setProperty("--c", cohort.color);
+      card.className = "cohort-card"; card.style.setProperty("--c", tone(cohort.color));
       const info = document.createElement("div"); info.className = "info";
       const title = document.createElement("strong"); title.textContent = cohort.label;
       const meta = document.createElement("div"); meta.className = "note";
