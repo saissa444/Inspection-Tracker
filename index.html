@@ -373,6 +373,91 @@ button.d-small{min-height:36px;padding:6px 12px;font-size:14px;margin:4px 0}
   @page{size:A4;margin:12mm}
 }
 .d-locked{background:#f1f4f8;color:var(--muted);cursor:default}
+
+/* ───── 質感與動畫（只改外觀，不影響功能） ───── */
+:root{--ease:cubic-bezier(.22,1,.36,1);--shadow-sm:0 1px 2px rgba(16,33,61,.05),0 2px 8px rgba(16,33,61,.04);--shadow-md:0 1px 2px rgba(16,33,61,.04),0 10px 30px rgba(16,33,61,.07);--ring:0 0 0 4px rgba(35,78,131,.16)}
+body{background:radial-gradient(1200px 500px at 85% -10%,#e3ecf8 0%,transparent 60%),radial-gradient(900px 400px at -10% 10%,#eef2fb 0%,transparent 55%),var(--bg);background-attachment:fixed;-webkit-font-smoothing:antialiased}
+h1,h2,h3{letter-spacing:.01em}
+section{border-color:rgba(214,224,237,.7);border-radius:20px;box-shadow:var(--shadow-md)}
+
+/* 進場動畫：分頁、內務子頁、訊息 */
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes popIn{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes slideUp{from{opacity:0;translate:0 16px}to{opacity:1;translate:0 0}}
+@keyframes badgePop{0%{transform:scale(.6)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+.tabpanel>section,#tab-dorm [data-pane]>section{animation:fadeUp .45s var(--ease) both}
+.tabpanel>section:nth-child(2),#tab-dorm [data-pane]>section:nth-child(2){animation-delay:.06s}
+.tabpanel>section:nth-child(3),#tab-dorm [data-pane]>section:nth-child(3){animation-delay:.12s}
+.status,.restore-ask,.pending,.editbox,#dPreview{animation:fadeIn .3s ease both}
+details>:not(summary){animation:fadeUp .3s var(--ease) both}
+.tab .count{animation:badgePop .35s var(--ease)}
+
+/* 頁首：漸層與毛玻璃 */
+.topbar{background:linear-gradient(120deg,#1b3f6c 0%,var(--brand) 45%,#2f68aa 100%);box-shadow:inset 0 -1px 0 rgba(255,255,255,.08)}
+.topbar button{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.topbar button:hover{background:rgba(255,255,255,.24)}
+.cohort-bar{background:rgba(255,255,255,.82);backdrop-filter:saturate(1.6) blur(14px);-webkit-backdrop-filter:saturate(1.6) blur(14px)}
+.cohort-btn{transition:background .25s var(--ease),color .25s var(--ease),box-shadow .25s var(--ease),transform .15s var(--ease)}
+
+/* 分頁：膠囊式切換 */
+.tabs{max-width:1212px;width:calc(100% - 28px);margin:16px auto 0;padding:5px;gap:4px;background:rgba(35,78,131,.07);border-radius:14px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:1 0 auto;border-radius:10px;background:transparent;color:var(--muted);min-height:40px;transition:background .25s var(--ease),color .25s var(--ease),box-shadow .25s var(--ease)}
+.tab:hover{color:var(--brand)}
+@media (max-width:520px){ .tab{flex:1 1 auto;padding:8px 6px;font-size:15px} .tab .count{margin-left:3px;padding:0 5px} }
+.tab[aria-selected="true"]{background:#fff;color:var(--brand);box-shadow:0 1px 2px rgba(16,33,61,.08),0 4px 12px rgba(16,33,61,.08)}
+.tabpanel>section:first-child{margin-top:16px;border-top-left-radius:20px}
+.d-subtabs button,.d-pick,.qp-cats button,.view-seg button,.d-seg button{transition:background .2s ease,color .2s ease,box-shadow .2s ease,transform .15s var(--ease)}
+
+/* 按鈕：細緻陰影、按下回饋 */
+button,.button{transition:transform .15s var(--ease),box-shadow .2s ease,background-color .2s ease,filter .2s ease,opacity .2s ease;-webkit-tap-highlight-color:transparent}
+.actions>button:not(.secondary):not(.danger),section>button:not(.secondary):not(.danger),form>button[type=submit]:not(.danger),.button.file-button:not(.secondary-file){box-shadow:0 1px 2px rgba(16,33,61,.12),0 2px 6px rgba(35,78,131,.18)}
+button:active:not(:disabled),.button:active{transform:scale(.97)}
+@media (hover:hover){
+  button:hover:not(:disabled),.button:hover{filter:brightness(1.07)}
+  section button:not(td button):not(.reason-choice):not(.group-item):not(.dragging):hover:not(:disabled){transform:translateY(-1px)}
+  .reason-choice:hover,.group-item:hover{border-color:#9db6d6;box-shadow:var(--shadow-sm)}
+}
+.file-button:focus-within{box-shadow:var(--ring)}
+
+/* 輸入框：柔和的聚焦光暈 */
+input,select,textarea{border-color:#cfd8e5;border-radius:11px;transition:border-color .2s ease,box-shadow .2s ease,background-color .2s ease}
+input:hover,select:hover,textarea:hover{border-color:#aebdd1}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand);box-shadow:var(--ring)}
+input[type="checkbox"]{transition:transform .15s var(--ease)}
+input[type="checkbox"]:active{transform:scale(.88)}
+
+/* 卡片、清單、表格 */
+.check-panel,.reason-browser,.groups-box,.edit-group,.cohort-card,.d-vcard{transition:box-shadow .25s ease,border-color .25s ease}
+.cohort-card,.d-vcard{box-shadow:var(--shadow-sm)}
+.status{border-radius:12px}
+.tablewrap{border-radius:14px}
+tbody tr{transition:background-color .2s ease}
+@media (min-width:1024px){ .tablewrap.records tbody tr:hover td{background:#f7faff} }
+@media (max-width:1023px){ .tablewrap tr{border-radius:14px;box-shadow:var(--shadow-sm);transition:box-shadow .2s ease,border-color .2s ease,background-color .2s ease} }
+details>summary{transition:color .2s ease}
+details>summary:hover{color:var(--brand)}
+
+/* 浮動元件：滑入出現 */
+#selBar{border-radius:16px;background:rgba(31,59,99,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 10px 30px rgba(16,33,61,.35);animation:slideUp .35s var(--ease) both}
+#toTop{animation:slideUp .35s var(--ease) both}
+
+/* 鎖定畫面 */
+#lockScreen{background:radial-gradient(900px 500px at 20% 0%,#dbe7f7 0%,transparent 60%),radial-gradient(800px 500px at 100% 100%,#e6ecf8 0%,transparent 60%),var(--bg)}
+.lock-card{animation:popIn .55s var(--ease) both;box-shadow:0 2px 4px rgba(16,33,61,.04),0 24px 60px rgba(16,33,61,.12)}
+
+/* 對話框 */
+dialog{border:0;border-radius:20px;box-shadow:0 24px 70px rgba(16,33,61,.3)}
+dialog[open]{animation:popIn .3s var(--ease) both}
+dialog::backdrop{background:rgba(16,33,61,.4);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);animation:fadeIn .25s ease both}
+
+.quick-phrases button.dragging{transform:scale(1.08)}
+
+/* 尊重系統「減少動態效果」設定 */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after,dialog::backdrop{animation-duration:.01ms!important;animation-delay:0s!important;transition-duration:.01ms!important}
+}
 </style>
 </head>
 <body>
