@@ -233,7 +233,13 @@
     let bk;
     try {
       bk = JSON.parse(new TextDecoder().decode(await readFile(file)));
-      if (!bk || bk.type !== "full-backup") throw new Error(bk && bk.app === "內務統計" ? "這是內務備份檔，請到「內務 › 備份與匯入」匯入。" : "這不是全部資料備份檔。");
+      if (bk && bk.type !== "full-backup" && Array.isArray(bk.reports)) {
+        // 舊的內務備份檔或線上版內務統計匯出檔：只匯入內務資料到目前期別
+        const res = await window.DormModule.importDormFile(bk);
+        fullMsg(escHtml(res.message), res.warn ? "" : "ok");
+        return;
+      }
+      if (!bk || bk.type !== "full-backup") throw new Error("這不是 App 的備份檔。請選擇「全部資料備份_日期.json」，或舊的內務備份檔。");
     } catch (error) { fullMsg("匯入失敗：" + escHtml(error.message), "error"); return; }
     await flushDrafts();
     const tplLocal = {};

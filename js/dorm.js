@@ -454,6 +454,35 @@
     $("dInspList").innerHTML = data.inspectors.map(n => `<option value="${esc(n)}"></option>`).join("");
   }
 
+  /** 匯入舊的內務備份檔／線上版內務統計匯出檔（放進目前選的期別）。由「備份」分頁呼叫。 */
+  async function importDormFile(d) {
+    if (!cohort()) throw new Error("請先到「名冊」匯入名冊並選擇目前期別。");
+    if (!d || !Array.isArray(d.reports)) throw new Error("這不是內務資料檔。");
+    const norm = index().norm, cd = cdata(), miss = new Set();
+    const conv = t => { const k = norm(String(t)); if (!k || k[0] === "?") { miss.add(String(t)); return null; } return k; };
+    let added = 0, replaced = 0;
+    for (const r of d.reports) {
+      if (!r.date) continue;
+      const items = (r.items || []).map(it => {
+        const notes = {};
+        const targets = it.scope === "p" ? it.targets.map(t => { const k = conv(t); if (k && it.notes && it.notes[t]) notes[k] = it.notes[t]; return k; }).filter(Boolean) : it.targets.slice();
+        if (it.scope !== "p") Object.assign(notes, it.notes || {});
+        return {scope: it.scope, item: it.item, sign: it.sign, targets, notes};
+      });
+      const key = r.id || r.date;
+      if (cd.reports[key]) replaced++; else added++;
+      cd.reports[key] = {date: r.date, inspector: r.inspector || "", raw: r.raw || "", savedAt: r.savedAt || new Date().toISOString(), items};
+    }
+    if (Array.isArray(d.rooms) && d.rooms.length) {
+      cd.roomsText = d.rooms.map(r => r.room + " " + r.members.join(" ")).join("\n");
+      cd.rooms = D.parseRooms(cd.roomsText, norm).rooms;
+      roomsEditing = false;
+    }
+    (d.inspectors || []).forEach(n => { if (n && !data.inspectors.includes(n)) data.inspectors.push(n); });
+    await flush(); render();
+    return {warn: miss.size > 0, message: `已把內務資料匯入「${cohort().label}」：${added + replaced} 次檢查（新增 ${added}、取代 ${replaced}）` + (d.rooms && d.rooms.length ? `和 ${d.rooms.length} 間寢室名單` : "") + "。這些舊紀錄不會轉入加扣分。" + (miss.size ? `名冊找不到的號碼已略過：${Array.from(miss).slice(0, 20).join("、")}` : "")};
+  }
+
   // 複製公告框內容（和加扣分「輸入學生」旁的複製鍵一樣，方便貼到 LINE）
   let copyTimer = null;
   async function copyRaw(btn) {
@@ -652,6 +681,7 @@
     cohortChanged() { if (!data) return; idxCache = {id: null}; roomsEditing = false; draft = null; month = null; q.room = ""; q.person = ""; if ($("dRaw")) $("dRaw").value = ""; render(); },
     templateChanged() { if (data && sub === "rooms") render(); },
     lock() { data = null; draft = null; if ($("tab-dorm")) $("tab-dorm").innerHTML = ""; },
-    flush() { return data ? flush() : Promise.resolve(); }
+    flush() { return data ? flush() : Promise.resolve(); },
+    importDormFile(d) { if (!data) throw new Error("內務模組尚未載入。"); return importDormFile(d); }
   };
 })();

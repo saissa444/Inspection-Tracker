@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>學生加扣分・獎懲登錄</title>
-<link rel="manifest" href="./manifest.webmanifest?v=20261022d">
+<link rel="manifest" href="./manifest.webmanifest?v=20261022e">
 <meta name="theme-color" content="#234e83">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="加扣分獎懲">
-<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261022d">
+<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261022e">
 <style>
 :root{--ink:#1d2939;--muted:#5b6b82;--line:#dce4ef;--bg:#f3f5f9;--card:#fff;--brand:#234e83;--brand-2:#2b5f9e;--soft:#eef4fc;--err:#ae2530;--ok:#127348;--warn:#8a4b08;--cohort:#234e83;font-family:system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;color:var(--ink);background:var(--bg)}
 *{box-sizing:border-box}
@@ -638,6 +638,7 @@ button.d-small{min-height:36px;padding:6px 12px;font-size:14px;margin:4px 0}
         <label class="button secondary">匯入全部資料備份<input type="file" id="fullRestore" accept=".json,application/json" hidden></label>
       </div>
       <div id="fullRestoreAsk" class="restore-ask" hidden></div>
+      <p class="note">也可以匯入舊的內務備份檔（內務備份_…json）或線上版內務統計匯出的檔案，內務紀錄會加進目前選的期別。</p>
       <p class="note">⚠️ 備份檔沒有加密，裡面有學生的隊號、姓名與學籍號碼，請存在自己的隨身碟或雲端，不要傳到公開的地方或上傳到 GitHub。</p>
     </section>
   </div>
@@ -663,11 +664,11 @@ button.d-small{min-height:36px;padding:6px 12px;font-size:14px;margin:4px 0}
 })();
 </script>
 <script defer src="./vendor/xlsx.full.min.js?v=0.20.3"></script>
-<script defer src="./js/core.js?v=20261022d"></script>
-<script defer src="./js/store.js?v=20261022d"></script>
-<script defer src="./js/dorm-core.js?v=20261022d"></script>
-<script defer src="./js/dorm.js?v=20261022d"></script>
-<script defer src="./js/app.js?v=20261022d"></script>
+<script defer src="./js/core.js?v=20261022e"></script>
+<script defer src="./js/store.js?v=20261022e"></script>
+<script defer src="./js/dorm-core.js?v=20261022e"></script>
+<script defer src="./js/dorm.js?v=20261022e"></script>
+<script defer src="./js/app.js?v=20261022e"></script>
 <script>if ("serviceWorker" in navigator && location.protocol === "https:") window.addEventListener("load", function () { navigator.serviceWorker.register("./sw.js").catch(function () {}); });</script>
 </body>
 </html>
