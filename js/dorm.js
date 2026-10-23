@@ -278,13 +278,13 @@
     if (!cdata().rooms.length && S.reportCount) w.push(["warning", "尚未設定寢室名單，寢室總分目前只有公區分數。"]);
     $("dStatsWarn").innerHTML = w.map(([k, t]) => `<div class="status ${k}">${esc(t)}</div>`).join("");
     const chips = (rs, pred) => {
-      const list = rs.flatMap(r => r.members.map(k => ({k, s: (S.people.get(k) || {score: 0}).score}))).filter(x => pred(x.s));
+      const list = rs.flatMap(r => r.members.map(k => { const p = S.people.get(k) || {score: 0, plus: 0, minus: 0}; return {k, s: p.score, p}; })).filter(x => pred(x.s, x.p));
       return list.length ? list.map(x => `<span class="d-chip">${esc(who(x.k))} ${esc(nameOf(x.k))} <b class="${tone(x.s)}">${fmt(x.s)}</b></span>`).join("") : `<span class="note">沒有</span>`;
     };
     const card = (cls, lab, rs, listLab, pred) => `<div class="d-vcard ${cls}"><div class="d-vlab">${lab}</div>` +
       (rs.length ? `<div class="d-vroom">${rs.map(r => esc(RL(r.room))).join("、")}<span class="${cls === "bad" ? "d-neg" : "d-pos"}">${fmt(rs[0].total)}</span></div>
         <div class="note">${listLab}</div><div class="d-chips">${chips(rs, pred)}</div>` : `<p class="note">資料不足，還分不出來。</p>`) + `</div>`;
-    $("dVerdict").innerHTML = card("bad", "最劣寢", S.worst, "寢內負分同學", s => s < 0) + card("good", "最優寢", S.best, "寢內正分同學", s => s > 0);
+    $("dVerdict").innerHTML = card("bad", "最劣寢", S.worst, "寢內負分同學", s => s < 0) + card("good", "最優寢", S.best, "寢內無負分同學（本月沒有被扣分）", (s, p) => !p.minus);
     const wS = new Set(S.worst.map(r => r.room)), bS = new Set(S.best.map(r => r.room));
     const desc = S.rooms.slice().reverse();
     $("dRoomTbl").innerHTML = `<thead><tr><th>名次</th><th>寢室</th><th class="r">室員合計</th><th class="r">公區</th><th class="r">總分</th></tr></thead><tbody>` +
@@ -293,10 +293,10 @@
   }
   function monthText() {
     const [from, to] = D.monthRange(month), S = D.summarize(reportsList(), cdata().rooms, from, to);
-    const names = (rs, pred) => rs.flatMap(r => r.members.map(k => ({k, s: (S.people.get(k) || {score: 0}).score}))).filter(x => pred(x.s)).map(x => who(x.k) + nameOf(x.k) + "(" + fmt(x.s) + ")").join("、") || "無";
+    const names = (rs, pred) => rs.flatMap(r => r.members.map(k => { const p = S.people.get(k) || {score: 0, plus: 0, minus: 0}; return {k, s: p.score, p}; })).filter(x => pred(x.s, x.p)).map(x => who(x.k) + nameOf(x.k) + "(" + fmt(x.s) + ")").join("、") || "無";
     const lines = [`${D.rocMonth(month)} 內務統計（共 ${S.reportCount} 次檢查）`];
     if (S.worst.length) lines.push(`最劣寢：${S.worst.map(r => RL(r.room)).join("、")}（${fmt(S.worst[0].total)}）`, `　負分同學：${names(S.worst, s => s < 0)}`);
-    if (S.best.length) lines.push(`最優寢：${S.best.map(r => RL(r.room)).join("、")}（${fmt(S.best[0].total)}）`, `　正分同學：${names(S.best, s => s > 0)}`);
+    if (S.best.length) lines.push(`最優寢：${S.best.map(r => RL(r.room)).join("、")}（${fmt(S.best[0].total)}）`, `　無負分同學：${names(S.best, (s, p) => !p.minus)}`);
     return lines.join("\n");
   }
 
@@ -511,10 +511,10 @@
     const c = cohort(), stamp = D.todayStr();
     if (kind === "month") {
       const [from, to] = D.monthRange(month), S = D.summarize(reportsList(), cdata().rooms, from, to);
-      const names = (rs, pred) => rs.flatMap(r => r.members.map(k => ({k, s: (S.people.get(k) || {score: 0}).score}))).filter(x => pred(x.s)).map(x => who(x.k) + " " + nameOf(x.k) + "（" + fmt(x.s) + "）").join("、") || "無";
+      const names = (rs, pred) => rs.flatMap(r => r.members.map(k => { const p = S.people.get(k) || {score: 0, plus: 0, minus: 0}; return {k, s: p.score, p}; })).filter(x => pred(x.s, x.p)).map(x => who(x.k) + " " + nameOf(x.k) + "（" + fmt(x.s) + "）").join("、") || "無";
       const summary = [];
       if (S.worst.length) summary.push("最劣寢：" + S.worst.map(r => RL(r.room)).join("、") + "（" + fmt(S.worst[0].total) + "）", "　負分同學：" + names(S.worst, v => v < 0));
-      if (S.best.length) summary.push("最優寢：" + S.best.map(r => RL(r.room)).join("、") + "（" + fmt(S.best[0].total) + "）", "　正分同學：" + names(S.best, v => v > 0));
+      if (S.best.length) summary.push("最優寢：" + S.best.map(r => RL(r.room)).join("、") + "（" + fmt(S.best[0].total) + "）", "　無負分同學：" + names(S.best, (v, p) => !p.minus));
       return {title: D.rocMonth(month) + " 內務統計", subtitle: c.label + "・共 " + S.reportCount + " 次檢查・" + from + " 至 " + to, summary, sheet: "月統計",
         columns: ["名次", "寢室", "室員合計", "公區", "總分"], numFrom: 2,
         rows: S.rooms.slice().reverse().map((r, i) => [i + 1, RL(r.room), num(r.mScore), num(r.pub), num(r.total)]),
