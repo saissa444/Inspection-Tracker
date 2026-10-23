@@ -89,7 +89,7 @@
 
   function download(bytes, filename) {
     // 依副檔名給正確的檔案類型（手機 Safari 會依類型決定怎麼存檔）
-    const type = /\.json$/i.test(filename) ? "application/json" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const type = /\.json$/i.test(filename) ? "application/json" : /\.pdf$/i.test(filename) ? "application/pdf" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     const url = URL.createObjectURL(new Blob([bytes], {type}));
     const a = document.createElement("a");
     a.href = url; a.download = filename; a.rel = "noopener";

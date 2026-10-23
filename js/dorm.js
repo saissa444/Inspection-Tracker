@@ -545,6 +545,7 @@
   function exportReport(kind, fmtType) {
     if (!cohort()) return;
     const rep = buildReport(kind);
+    lastRep = rep;
     if (fmtType === "xlsx") {
       const XL = window.XLSX;
       if (!XL) { alert("Excel 元件沒有載入，請重新整理後再試。"); return; }
@@ -553,7 +554,7 @@
       ws["!cols"] = rep.columns.map((col, i) => ({wch: Math.max(6, col.length * 2 + 2, ...rep.rows.slice(0, 300).map(r => String(r[i] == null ? "" : r[i]).length * (typeof r[i] === "number" ? 1 : 2)))}));
       // 分數欄顯示一位小數、正數加「+」
       rep.rows.forEach((row, ri) => row.forEach((v, ci) => {
-        if (typeof v !== "number" || ci < rep.numFrom || !/分$|^室員合計$|^公區$/.test(rep.columns[ci])) return;
+        if (typeof v !== "number" || ci < rep.numFrom || !/分$|^分數$|^室員合計$|^公區$/.test(rep.columns[ci])) return;
         const cell = ws[XL.utils.encode_cell({r: ri + aoa.length - rep.rows.length, c: ci})]; if (cell) cell.z = "+0.0;-0.0;0.0";
       }));
       if (rep.groups) {   // 一次檢查佔數列：原始公告一行一列，前面欄位合併
@@ -572,7 +573,7 @@
     // PDF：開啟列印，選「另存為 PDF」
     let el = $("dPrint");
     if (!el) { el = document.createElement("div"); el.id = "dPrint"; document.body.append(el); }
-    const isScore = i => i >= rep.numFrom && /分$|^室員合計$|^公區$/.test(rep.columns[i]);
+    const isScore = i => i >= rep.numFrom && /分$|^分數$|^室員合計$|^公區$/.test(rep.columns[i]);
     const cell = (v, i) => typeof v === "number" ? (isScore(i) ? (v > 0 ? "+" : "") + v.toFixed(1) : String(v)) : esc(v);
     el.innerHTML = `<h1>${esc(rep.title)}</h1><p class="sub">${esc(rep.subtitle)}・列印日期 ${D.todayStr()}</p>` +
       rep.summary.map(x => `<p>${esc(x)}</p>`).join("") + (rep.cards ? (rep.cards.map(x =>
@@ -599,17 +600,164 @@
     let bar = $("dPrintBar");
     if (!bar) {
       bar = document.createElement("div"); bar.id = "dPrintBar";
-      bar.innerHTML = `<div class="d-pbar-row"><button type="button" id="dPrintGo">列印／存成 PDF</button><button type="button" id="dPrintClose" class="secondary">關閉</button></div>` +
-        `<p class="d-pbar-note">iPhone：按「列印／存成 PDF」→ 右上角分享鍵 →「儲存到檔案」。若按了沒有反應（從主畫面開的 App），請改用 Safari 打開網站再試。</p>`;
+      bar.innerHTML = `<div class="d-pbar-row"><button type="button" id="dPdfSave" disabled>PDF 準備中…</button><button type="button" id="dPrintGo" class="secondary">列印</button><button type="button" id="dPrintClose" class="secondary">關閉</button></div>` +
+        `<p class="d-pbar-note">按「儲存 PDF 檔」→ 選「儲存到檔案」，或直接傳到 LINE。</p>`;
       document.body.append(bar);
+      $("dPdfSave").addEventListener("click", savePdf);
       $("dPrintGo").addEventListener("click", printNow);
       $("dPrintClose").addEventListener("click", () => { document.body.classList.remove("d-previewing"); window.scrollTo(0, previewScroll); });
     }
+    // 從主畫面開的 App（iPhone）不能列印，只留「儲存 PDF 檔」
+    $("dPrintGo").hidden = navigator.standalone === true || (window.matchMedia && matchMedia("(display-mode: standalone)").matches);
     previewScroll = window.scrollY;
     document.body.classList.add("d-previewing");
     $("dPrint").scrollTop = 0;
+    const btn = $("dPdfSave"), rep = lastRep, job = ++pdfJob;
+    pdfBytes = null; btn.disabled = true; btn.textContent = "PDF 準備中…";
+    setTimeout(() => {
+      if (job !== pdfJob) return;
+      try { pdfBytes = reportToPdf(rep); btn.textContent = "儲存 PDF 檔"; btn.disabled = false; }
+      catch (e) { console.warn(e); btn.textContent = "PDF 產生失敗"; }
+    }, 60);
   }
-  let previewScroll = 0;
+  let previewScroll = 0, lastRep = null, pdfBytes = null, pdfJob = 0;
+  /** 儲存 PDF：手機用分享選單（可存到「檔案」或傳 LINE），不支援時改成下載 */
+  function savePdf() {
+    if (!pdfBytes || !lastRep) return;
+    const name = lastRep.file + ".pdf";
+    try {
+      const file = new File([pdfBytes], name, {type: "application/pdf"});
+      if (navigator.canShare && navigator.canShare({files: [file]})) { navigator.share({files: [file], title: lastRep.title}).catch(() => {}); return; }
+    } catch (e) { /* 改用下載 */ }
+    B.download(pdfBytes, name);
+  }
+
+  /* ═════ 直接產生 PDF 檔（畫成 A4 圖片再包成 PDF；從主畫面開的 App 也能用） ═════ */
+  const PDF_FONT = '-apple-system,"PingFang TC","Heiti TC","Microsoft JhengHei","Noto Sans TC","Noto Sans CJK TC",sans-serif';
+  function reportToPdf(rep) {
+    const S = 2, PW = 794, PH = 1123, M = 45, AW = PW - 2 * M, jpgs = [];
+    const cv = document.createElement("canvas"); cv.width = PW * S; cv.height = PH * S;
+    const ctx = cv.getContext("2d"); ctx.scale(S, S); ctx.textBaseline = "top";
+    let y = M, pageNo = 0, open = false;
+    const font = (px, bold) => (bold ? "bold " : "") + px + "px " + PDF_FONT;
+    const finishPage = () => {
+      ctx.fillStyle = "#888"; ctx.font = font(11); const f = "第 " + pageNo + " 頁";
+      ctx.fillText(f, PW / 2 - ctx.measureText(f).width / 2, PH - M + 14);
+      const b64 = cv.toDataURL("image/jpeg", 0.88).split(",")[1], bin = atob(b64), u = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+      jpgs.push(u); open = false;
+    };
+    const newPage = () => { if (open) finishPage(); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, PW, PH); y = M; pageNo++; open = true; };
+    const wrap = (text, width, f) => {
+      ctx.font = f; const out = [];
+      String(text == null ? "" : text).split("\n").forEach(par => {
+        let line = "";
+        for (const ch of Array.from(par)) {
+          if (line && ctx.measureText(line + ch).width > width) { out.push(line); line = ch; } else line += ch;
+        }
+        out.push(line);
+      });
+      return out;
+    };
+    const rr = (x, y0, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y0); ctx.arcTo(x + w, y0, x + w, y0 + h, r); ctx.arcTo(x + w, y0 + h, x, y0 + h, r); ctx.arcTo(x, y0 + h, x, y0, r); ctx.arcTo(x, y0, x + w, y0, r); ctx.closePath(); };
+    const text = (t, x, yy, f, color) => { ctx.font = f; ctx.fillStyle = color || "#000"; ctx.fillText(t, x, yy); };
+
+    newPage();
+    text(rep.title, M, y, font(21, true)); y += 32;
+    wrap(rep.subtitle + "・列印日期 " + D.todayStr(), AW, font(12)).forEach(l => { text(l, M, y, font(12), "#444"); y += 17; });
+    y += 6;
+    rep.summary.forEach(s => wrap(s, AW, font(13)).forEach(l => { if (y + 19 > PH - M) newPage(); text(l, M, y, font(13)); y += 19; }));
+    if (rep.summary.length) y += 8;
+
+    if (rep.cards) {
+      if (!rep.cards.length) text("還沒有紀錄。", M, y, font(13));
+      const lh = 19;
+      rep.cards.forEach(c => {
+        const raw = wrap(c.raw || "", AW - 20, font(13));
+        if (y + 30 + 20 + Math.min(raw.length, 3) * lh + 16 > PH - M) newPage();
+        ctx.strokeStyle = "#d5dbe5"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(M, y + 0.5); ctx.lineTo(M + AW, y + 0.5); ctx.stroke();
+        y += 10;
+        text(c.date, M, y, font(16, true));
+        let x = M + ctx.measureText(c.date).width + 8;
+        if (c.nth) { text(c.nth, x, y + 2, font(14, true)); x += ctx.measureText(c.nth).width + 8; }
+        text(c.n + " 筆優缺點" + (c.pts ? "・加扣分預覽表 " + c.pts + " 筆" : ""), x, y + 4, font(12), "#5b6475");
+        const insp = c.inspector || "未填"; ctx.font = font(13, !!c.inspector);
+        const iw = Math.max(ctx.measureText(insp).width + 22, 76), bx = M + AW - iw;
+        ctx.strokeStyle = "#c8cfdb"; rr(bx, y - 3, iw, 24, 5); ctx.stroke();
+        text(insp, bx + 11, y + 2, font(13, !!c.inspector), c.inspector ? "#000" : "#999");
+        ctx.font = font(12); text("檢查人", bx - ctx.measureText("檢查人").width - 8, y + 3, font(12), "#5b6475");
+        y += 30;
+        text("原始公告", M, y, font(12), "#5b6475"); y += 20;
+        let i = 0;
+        while (i < raw.length) {
+          const room = Math.floor((PH - M - y - 16) / lh);
+          if (room < 1) { newPage(); continue; }
+          const part = raw.slice(i, i + room), h = part.length * lh + 16;
+          ctx.fillStyle = "#eef2f9"; rr(M, y, AW, h, 6); ctx.fill();
+          part.forEach((l, k) => text(l, M + 10, y + 8 + k * lh, font(13)));
+          y += h; i += part.length;
+          if (i < raw.length) newPage();
+        }
+        y += 14;
+      });
+    } else {
+      const cols = rep.columns, hf = font(12, true), bf = font(12), padX = 6, padY = 5, lh = 17;
+      const isScore = i => i >= rep.numFrom && /分$|^分數$|^室員合計$|^公區$/.test(cols[i]);
+      const txt = (v, i) => typeof v === "number" ? (isScore(i) ? (v > 0 ? "+" : "") + v.toFixed(1) : String(v)) : String(v == null ? "" : v);
+      const rows = rep.rows.map(r => r.map(txt));
+      ctx.font = hf; const nat = cols.map(c => ctx.measureText(c).width);
+      ctx.font = bf; rows.forEach(r => r.forEach((t, i) => { nat[i] = Math.max(nat[i], ctx.measureText(t).width); }));
+      let w = nat.map(n => Math.ceil(n) + padX * 2), total = w.reduce((a, b) => a + b, 0);
+      if (total <= AW) { const extra = (AW - total) / w.length; w = w.map(v => v + extra); }
+      else {
+        while (total > AW + 0.5) { const i = w.indexOf(Math.max(...w)), cut = Math.min(total - AW, w[i] - 60); if (cut <= 0) break; w[i] -= cut; total -= cut; }
+        if (total > AW) w = w.map(v => v * AW / total);
+      }
+      const lines = (cells, f) => cells.map((t, i) => wrap(t, w[i] - padX * 2, f));
+      const head = lines(cols, hf);
+      const drawRow = (ls, isHead) => {
+        const h = Math.max(...ls.map(l => l.length)) * lh + padY * 2;
+        if (!isHead && y + h > PH - M) { newPage(); drawRow(head, true); }
+        if (isHead) { ctx.fillStyle = "#e8edf4"; ctx.fillRect(M, y, AW, h); }
+        let x = M;
+        ls.forEach((cell, i) => {
+          const f = isHead ? hf : bf; ctx.font = f;
+          cell.forEach((l, k) => { const tx = i >= rep.numFrom ? x + w[i] - padX - ctx.measureText(l).width : x + padX; text(l, tx, y + padY + k * lh, f); });
+          ctx.strokeStyle = "#999"; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, w[i], h);
+          x += w[i];
+        });
+        y += h;
+      };
+      drawRow(head, true);
+      if (!rows.length) { ctx.strokeStyle = "#999"; ctx.strokeRect(M + 0.5, y + 0.5, AW, 27); text("沒有資料", M + padX, y + padY, bf); y += 27; }
+      rows.forEach(r => drawRow(lines(r, bf), false));
+    }
+    finishPage();
+    cv.width = cv.height = 0;
+    return buildPdf(jpgs, PW * S, PH * S);
+  }
+  function buildPdf(jpgs, iw, ih) {
+    const enc = new TextEncoder(), parts = [], offs = [];
+    let len = 0;
+    const push = b => { const u = typeof b === "string" ? enc.encode(b) : b; parts.push(u); len += u.length; };
+    const obj = (id, body) => { offs[id] = len; push(id + " 0 obj\n"); body(); push("\nendobj\n"); };
+    push("%PDF-1.4\n");
+    const n = jpgs.length, kids = jpgs.map((_, i) => (3 + i * 3) + " 0 R").join(" ");
+    obj(1, () => push("<< /Type /Catalog /Pages 2 0 R >>"));
+    obj(2, () => push("<< /Type /Pages /Kids [" + kids + "] /Count " + n + " >>"));
+    jpgs.forEach((jpg, i) => {
+      const p = 3 + i * 3, cs = "q 595.28 0 0 841.89 0 0 cm /Im0 Do Q";
+      obj(p, () => push("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /XObject << /Im0 " + (p + 2) + " 0 R >> >> /Contents " + (p + 1) + " 0 R >>"));
+      obj(p + 1, () => push("<< /Length " + cs.length + " >>\nstream\n" + cs + "\nendstream"));
+      obj(p + 2, () => { push("<< /Type /XObject /Subtype /Image /Width " + iw + " /Height " + ih + " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " + jpg.length + " >>\nstream\n"); push(jpg); push("\nendstream"); });
+    });
+    const total = 3 + n * 3, xref = len;
+    push("xref\n0 " + total + "\n0000000000 65535 f \n" + offs.slice(1, total).map(o => String(o).padStart(10, "0") + " 00000 n \n").join(""));
+    push("trailer\n<< /Size " + total + " /Root 1 0 R >>\nstartxref\n" + xref + "\n%%EOF\n");
+    const out = new Uint8Array(len); let o = 0;
+    parts.forEach(u => { out.set(u, o); o += u.length; });
+    return out;
+  }
 
   /* ═════ 事件 ═════ */
   function bind() {
