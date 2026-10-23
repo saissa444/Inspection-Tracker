@@ -198,7 +198,7 @@
     });
     if (!local.settings.quickPhrases && !local.settings.quickCatOrder && bk.settings) {
       out.settings = Object.assign({}, local.settings);
-      ["quickPhrases", "quickCatOrder", "quickHiddenCats", "quickCustomCats", "quickGongwuNext"].forEach(k => { if (k in bk.settings) out.settings[k] = bk.settings[k]; });
+      ["quickPhrases", "quickCatOrder", "quickHiddenCats", "quickCustomCats", "quickGongwuNext", "quickLeAdded"].forEach(k => { if (k in bk.settings) out.settings[k] = bk.settings[k]; });
     }
     const ld = Object.assign({mapping: null, autoPoints: true, inspectors: [], byCohort: {}}, local.dorm), bd = Object.assign({inspectors: [], byCohort: {}}, bk.dorm);
     const dorm = Object.assign({}, ld, {mapping: ld.mapping || bd.mapping || null, inspectors: ld.inspectors.concat(bd.inspectors.filter(n => !ld.inspectors.includes(n))), byCohort: Object.assign({}, ld.byCohort)});
@@ -965,7 +965,9 @@
     ["個人區域", ["地板不潔"]],
     ["公共區域", ["窗溝不潔", "桌櫃灰塵", "地板不潔", "鏡面不潔", "設備灰塵", "桌子未對齊", "平台不潔"]],
     ["育五", Array.from({length: 10}, (_, i) => "育五" + (i + 1))],
-    ["育六", Array.from({length: 10}, (_, i) => "育六" + (i + 1))]
+    ["育六", Array.from({length: 10}, (_, i) => "育六" + (i + 1))],
+    ["樂五", Array.from({length: 10}, (_, i) => "樂五" + (i + 1))],
+    ["樂六", Array.from({length: 10}, (_, i) => "樂六" + (i + 1))]
   ];
   const QUICK_CUSTOM = "自訂"; // 自己新增的其他狀況（不一定是內務），不自動帶入扣分事由
   const QUICK_DIRECT = ["公物"]; // 分類列上直接填入的標籤（不用再展開）
@@ -983,12 +985,18 @@
   /** 目前顯示的分類（含公物）：照 settings.quickCatOrder 排序，新出現的接在後面，刪掉的不顯示 */
   function quickCatList() {
     const hidden = hiddenCats();
-    const names = BUILTIN_CATS.concat(customCats()).filter(cat => !hidden.includes(cat));
+    const names = Array.from(new Set(BUILTIN_CATS.concat(customCats()))).filter(cat => !hidden.includes(cat));
     // 一次性調整：已自訂過排序的，也把「公物」移到「自訂」正右邊
     if (Array.isArray(settings.quickCatOrder) && !settings.quickGongwuNext) {
       const o = settings.quickCatOrder.filter(cat => !QUICK_DIRECT.includes(cat)), at = o.indexOf(QUICK_CUSTOM);
       o.splice(at < 0 ? 0 : at + 1, 0, ...QUICK_DIRECT);
       settings.quickCatOrder = o; settings.quickGongwuNext = true; saveSettings();
+    }
+    // 一次性調整：已自訂過排序的，新加的「樂五」「樂六」放在「育六」後面（沒有育六就接在最後）
+    if (Array.isArray(settings.quickCatOrder) && !settings.quickLeAdded) {
+      const o = settings.quickCatOrder.filter(cat => cat !== "樂五" && cat !== "樂六"), at = o.indexOf("育六");
+      if (at >= 0) o.splice(at + 1, 0, "樂五", "樂六"); else o.push("樂五", "樂六");
+      settings.quickCatOrder = o; settings.quickLeAdded = true; saveSettings();
     }
     const saved = Array.isArray(settings.quickCatOrder) ? settings.quickCatOrder.filter(cat => names.includes(cat)) : [];
     return saved.concat(names.filter(cat => !saved.includes(cat)));
@@ -1310,9 +1318,9 @@
     const trimmed = before.replace(/[ \t\u3000]+$/, "");
     const lastToken = trimmed.split(/[\s、,，]+/).pop();
     if (quickTarget === "dRaw") {
-      // 內務公告：一個項目一行；寢室號（育五3）接在同一行後面
+      // 內務公告：一個項目一行；寢室號（育五3、樂五3）接在同一行後面
       const isRoom = window.DormCore && window.DormCore.normRoom(text);
-      if (isRoom) { if (before && !/\s$/.test(before)) before += /育[一二三四五六七八九十\d]+$/.test(trimmed) ? "、" : " "; }
+      if (isRoom) { if (before && !/\s$/.test(before)) before += /[育樂][一二三四五六七八九十\d]+寢?$/.test(trimmed) ? "、" : " "; }
       else if (trimmed && !/\n$/.test(before)) before = trimmed + "\n";
     }
     else if (trimmed && ALL_PHRASES.has(lastToken)) before = trimmed + "、"; // 緊接在另一個常用狀況後：用「、」合併成同一個註記

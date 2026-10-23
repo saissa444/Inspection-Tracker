@@ -142,15 +142,15 @@
 
     <div data-pane="entry">
       <section>
-        <div class="label-row"><h2 style="margin:0">貼上內務公告</h2><span class="copy-group"><button type="button" id="dRawCopy" class="copy-btn secondary" aria-label="複製公告內容">複製</button><button type="button" id="dRawPaste" class="copy-btn secondary" aria-label="貼上剪貼簿內容">貼上</button><button type="button" id="dRawClear" class="copy-btn secondary clear-btn" aria-label="清空公告內容">清空</button></span></div>
-        <div class="d-ocr-row"><label class="button secondary d-ocrbtn" id="dOcrBtn">📷 從圖片辨識<input type="file" id="dOcrFile" accept="image/*" hidden></label><span id="dOcrMsg" class="note" role="status" aria-live="polite"></span></div>
+        <div class="label-row"><h2 style="margin:0">貼上內務公告</h2><span class="copy-group"><label class="button secondary copy-btn d-ocrbtn" id="dOcrBtn" title="從圖片辨識公告文字" aria-label="從圖片辨識公告文字">圖片<input type="file" id="dOcrFile" accept="image/*" hidden></label><button type="button" id="dRawCopy" class="copy-btn secondary" aria-label="複製公告內容">複製</button><button type="button" id="dRawPaste" class="copy-btn secondary" aria-label="貼上剪貼簿內容">貼上</button><button type="button" id="dRawClear" class="copy-btn secondary clear-btn" aria-label="清空公告內容">清空</button></span></div>
+        <p id="dOcrMsg" class="note d-ocrmsg" role="status" aria-live="polite"></p>
         <details id="dOcrPreview" class="d-ocrprev" open hidden><summary>對照圖片（核對用，不會存起來）</summary><img id="dOcrImg" alt="公告圖片"></details>
         <div class="input-cohort">對象：<span class="cohort-tag active-cohort-tag"></span>（用這一期的名冊辨識女生隊號、建制隊號；建制隊號也會對照其他期別）</div>
         <textarea id="dRaw" style="min-height:180px" placeholder="把 LINE 上的內務檢查公告整則貼上，例如：&#10;1151019內務檢查&#10;被優：002 003&#10;棉被不潔 088 444194&#10;公物&#10;窗溝不潔 育五7、6-2"></textarea>
         <div id="dQuickSlot"></div>
         <p class="note">「公物」那一行以下算公區（寫寢室號），以上算個人（寫女生隊號或建制隊號）。項目後面有標「(+0.2)」「(-0.2)」就照標示；標「(寢室記大X)」算那間寢室的公區缺點。沒有標示時，項目名稱有「優、整潔、整齊、乾淨」算加分，其他算扣分。點分數標籤可以改。</p>
         <details class="d-imghelp"><summary>公告是圖片？</summary>
-          <p class="note">按上方「📷 從圖片辨識」選圖片，App 會自己辨識（第一次使用要下載約 6 MB 的辨識資料，之後不用網路）。如果辨識不理想，也可以用手機或電腦內建的文字辨識：</p>
+          <p class="note">按標題右邊的「圖片」選公告圖片，App 會自己辨識（第一次使用要下載約 6 MB 的辨識資料，之後不用網路）。如果辨識不理想，也可以用手機或電腦內建的文字辨識：</p>
           <ul>
             <li><b>iPhone</b>：LINE 的圖片先「儲存」到照片，在「照片」打開，長按圖上的文字 →「全選」→「拷貝」，回到這裡按「貼上」。</li>
             <li><b>Mac</b>：用「預覽程式」或「照片」打開圖片，直接拖曳選取文字（或 ⌘A）→ ⌘C，回到這裡貼上。</li>

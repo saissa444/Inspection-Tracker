@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>學生加扣分・獎懲登錄</title>
-<link rel="manifest" href="./manifest.webmanifest?v=20261023h">
+<link rel="manifest" href="./manifest.webmanifest?v=20261023i">
 <meta name="theme-color" content="#526a85">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="加扣分獎懲">
-<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261023h">
+<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261023i">
 <style>
 :root{--ink:#3b3a37;--muted:#6e6862;--line:#e4ded5;--bg:#f1eee9;--card:#fff;--brand:#526a85;--brand-2:#5d7893;--soft:#edf0f3;--err:#9c5454;--ok:#557357;--warn:#8a6538;--cohort:#526a85;font-family:system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;color:var(--ink);background:var(--bg)}
 *{box-sizing:border-box}
@@ -354,8 +354,10 @@ button.d-small{min-height:36px;padding:6px 12px;font-size:14px;margin:4px 0}
 .d-vers{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0}
 #dRoomsBtns{align-items:center;flex-wrap:wrap;gap:6px 10px}
 #dRoomsBtns input[type=date]{width:auto;margin:0 4px}
-.d-ocr-row{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;margin:0 0 6px}
-.d-ocr-row .d-ocrbtn{margin:0}
+/* 「圖片」鍵：跟複製／貼上／清空同樣大小，但電腦上也要顯示 */
+.copy-btn.d-ocrbtn{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;background:#e9ecef;color:var(--brand);box-shadow:none}
+.d-ocrmsg{margin:0 0 6px}
+.d-ocrmsg:empty{display:none}
 .d-ocrbtn.busy{opacity:.6;pointer-events:none}
 .d-ocrprev{margin:6px 0 8px}
 .d-ocrprev summary{cursor:pointer;color:var(--brand);font-weight:600;font-size:14px}
@@ -777,12 +779,12 @@ dialog::backdrop{background:rgba(60,52,44,.4);backdrop-filter:blur(3px);-webkit-
 })();
 </script>
 <script defer src="./vendor/xlsx.full.min.js?v=0.20.3"></script>
-<script defer src="./js/core.js?v=20261023h"></script>
-<script defer src="./js/store.js?v=20261023h"></script>
-<script defer src="./js/dorm-core.js?v=20261023h"></script>
-<script defer src="./js/ocr.js?v=20261023h"></script>
-<script defer src="./js/dorm.js?v=20261023h"></script>
-<script defer src="./js/app.js?v=20261023h"></script>
+<script defer src="./js/core.js?v=20261023i"></script>
+<script defer src="./js/store.js?v=20261023i"></script>
+<script defer src="./js/dorm-core.js?v=20261023i"></script>
+<script defer src="./js/ocr.js?v=20261023i"></script>
+<script defer src="./js/dorm.js?v=20261023i"></script>
+<script defer src="./js/app.js?v=20261023i"></script>
 <script>if ("serviceWorker" in navigator && location.protocol === "https:") window.addEventListener("load", function () { navigator.serviceWorker.register("./sw.js").catch(function () {}); });</script>
 </body>
 </html>
