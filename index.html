@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>學生加扣分・獎懲登錄</title>
-<link rel="manifest" href="./manifest.webmanifest?v=20261023b">
+<link rel="manifest" href="./manifest.webmanifest?v=20261023d">
 <meta name="theme-color" content="#526a85">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="加扣分獎懲">
-<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261023b">
+<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261023d">
 <style>
 :root{--ink:#3b3a37;--muted:#6e6862;--line:#e4ded5;--bg:#f1eee9;--card:#fff;--brand:#526a85;--brand-2:#5d7893;--soft:#edf0f3;--err:#9c5454;--ok:#557357;--warn:#8a6538;--cohort:#526a85;font-family:system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;color:var(--ink);background:var(--bg)}
 *{box-sizing:border-box}
@@ -349,27 +349,39 @@ button.d-small{min-height:36px;padding:6px 12px;font-size:14px;margin:4px 0}
 .d-filebtn{margin:8px 8px 4px 0}
 .d-export{display:inline-flex;gap:6px;flex-wrap:wrap;margin-left:auto}
 #dPrint{display:none}
+#dPrintBar{display:none}
+#dPrint{color:#000;font-size:10.5pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+#dPrint h1{font-size:16pt;margin:0 0 4px}
+#dPrint .sub{color:#444;margin:0 0 8px}
+#dPrint p{margin:2px 0}
+#dPrint table{border-collapse:separate;border-spacing:0;width:calc(100% - 4px);box-sizing:border-box;margin:8px 2px 0 1px;border-top:1px solid #999;border-left:1px solid #999}
+#dPrint th,#dPrint td{border:0;border-right:1px solid #999;border-bottom:1px solid #999;padding:3px 6px;font-size:9.5pt;text-align:left}
+#dPrint th{background:#e8edf4;position:static!important;top:auto!important}
+#dPrint .r{text-align:right}
+#dPrint thead{display:table-header-group}
+#dPrint tr{page-break-inside:avoid}
+#dPrint .pr-rep{border-top:1px solid #d5dbe5;padding:10px 0 12px;page-break-inside:avoid}
+#dPrint .pr-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:4px}
+#dPrint .pr-date{font-size:13pt}
+#dPrint .pr-note{color:#5b6475;font-size:10pt}
+#dPrint .pr-insp{color:#5b6475;font-size:10pt;white-space:nowrap}
+#dPrint .pr-insp span{color:#000;font-weight:bold;border:1px solid #c8cfdb;border-radius:5px;padding:2px 10px;display:inline-block;min-width:5em}
+#dPrint .pr-insp span.pr-empty{color:#999;font-weight:normal}
+#dPrint .pr-raw{background:#eef2f9;border-radius:6px;padding:8px 10px;margin:4px 0 0;white-space:pre-wrap;word-break:break-all;font-family:inherit;font-size:10.5pt;line-height:1.55}
+/* 手機：列印前的全螢幕預覽 */
+body.d-previewing{overflow:hidden}
+body.d-previewing>#dPrint{display:block;position:fixed;inset:0;z-index:9998;overflow:auto;-webkit-overflow-scrolling:touch;background:#fff;padding:118px 14px 40px}
+body.d-previewing>#dPrintBar{display:block;position:fixed;top:0;left:0;right:0;z-index:9999;background:#fff;border-bottom:1px solid #d5dbe5;padding:8px 14px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+body.d-previewing>#dPrint th,body.d-previewing>#dPrint td{white-space:nowrap;font-size:13px;padding:4px 6px}
+body.d-previewing>#dPrint .pr-raw{font-size:14px}
+#dPrintBar .d-pbar-row{display:flex;gap:8px}
+#dPrintBar .d-pbar-row button{margin:0}
+#dPrintBar .d-pbar-note{margin:6px 0 0;font-size:12.5px;color:#5b6475;line-height:1.45}
 @media print{
   body.d-printing>*{display:none!important}
-  body.d-printing>#dPrint{display:block!important}
-  #dPrint{color:#000;font-size:10.5pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  #dPrint h1{font-size:16pt;margin:0 0 4px}
-  #dPrint .sub{color:#444;margin:0 0 8px}
-  #dPrint p{margin:2px 0}
-  #dPrint table{border-collapse:separate;border-spacing:0;width:100%;box-sizing:border-box;margin-top:8px;border-top:1px solid #999;border-left:1px solid #999}
-  #dPrint th,#dPrint td{border:0;border-right:1px solid #999;border-bottom:1px solid #999;padding:3px 6px;font-size:9.5pt;text-align:left}
-  #dPrint th{background:#e8edf4}
-  #dPrint .r{text-align:right}
-  #dPrint thead{display:table-header-group}
-  #dPrint tr{page-break-inside:avoid}
-  #dPrint .pr-rep{border-top:1px solid #d5dbe5;padding:10px 0 12px;page-break-inside:avoid}
-  #dPrint .pr-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:4px}
-  #dPrint .pr-date{font-size:13pt}
-  #dPrint .pr-note{color:#5b6475;font-size:10pt}
-  #dPrint .pr-insp{color:#5b6475;font-size:10pt;white-space:nowrap}
-  #dPrint .pr-insp span{color:#000;font-weight:bold;border:1px solid #c8cfdb;border-radius:5px;padding:2px 10px;display:inline-block;min-width:5em}
-  #dPrint .pr-insp span.pr-empty{color:#999;font-weight:normal}
-  #dPrint .pr-raw{background:#eef2f9;border-radius:6px;padding:8px 10px;margin:4px 0 0;white-space:pre-wrap;word-break:break-all;font-family:inherit;font-size:10.5pt;line-height:1.55}
+  body.d-printing>#dPrint{display:block!important;position:static!important;overflow:visible!important;padding:0!important;inset:auto!important}
+  body.d-printing>#dPrint th,body.d-printing>#dPrint td{white-space:normal!important;font-size:9.5pt!important;padding:3px 6px!important}
+  body.d-printing{overflow:visible!important}
   @page{size:A4;margin:12mm}
 }
 .d-locked{background:#f0eeea;color:var(--muted);cursor:default}
@@ -749,11 +761,11 @@ dialog::backdrop{background:rgba(60,52,44,.4);backdrop-filter:blur(3px);-webkit-
 })();
 </script>
 <script defer src="./vendor/xlsx.full.min.js?v=0.20.3"></script>
-<script defer src="./js/core.js?v=20261023b"></script>
-<script defer src="./js/store.js?v=20261023b"></script>
-<script defer src="./js/dorm-core.js?v=20261023b"></script>
-<script defer src="./js/dorm.js?v=20261023b"></script>
-<script defer src="./js/app.js?v=20261023b"></script>
+<script defer src="./js/core.js?v=20261023d"></script>
+<script defer src="./js/store.js?v=20261023d"></script>
+<script defer src="./js/dorm-core.js?v=20261023d"></script>
+<script defer src="./js/dorm.js?v=20261023d"></script>
+<script defer src="./js/app.js?v=20261023d"></script>
 <script>if ("serviceWorker" in navigator && location.protocol === "https:") window.addEventListener("load", function () { navigator.serviceWorker.register("./sw.js").catch(function () {}); });</script>
 </body>
 </html>

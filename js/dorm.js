@@ -582,11 +582,34 @@
       `<table><thead><tr>${rep.columns.map((col, i) => `<th class="${i >= rep.numFrom ? "r" : ""}">${esc(col)}</th>`).join("")}</tr></thead><tbody>` +
       (rep.rows.map(r => `<tr>${r.map((v, i) => `<td class="${i >= rep.numFrom ? "r" : ""}">${cell(v, i)}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${rep.columns.length}">沒有資料</td></tr>`) +
       `</tbody></table>`);
+    // 手機／平板：先全螢幕預覽，再由預覽上的按鈕直接開列印（iPhone Safari 只允許「點按當下」開列印）
+    const touch = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (touch) { showPrintPreview(); return; }
+    printNow();
+  }
+  function printNow() {
+    if ($("dPrint")) $("dPrint").scrollTop = 0;
     document.body.classList.add("d-printing");
     const done = () => { document.body.classList.remove("d-printing"); window.removeEventListener("afterprint", done); };
     window.addEventListener("afterprint", done);
-    setTimeout(() => { window.print(); setTimeout(done, 1000); }, 50);
+    try { window.print(); } catch (e) { done(); alert("這個瀏覽器無法列印，請改用 Safari 或 Chrome 開啟。"); return; }
+    setTimeout(done, 1500);
   }
+  function showPrintPreview() {
+    let bar = $("dPrintBar");
+    if (!bar) {
+      bar = document.createElement("div"); bar.id = "dPrintBar";
+      bar.innerHTML = `<div class="d-pbar-row"><button type="button" id="dPrintGo">列印／存成 PDF</button><button type="button" id="dPrintClose" class="secondary">關閉</button></div>` +
+        `<p class="d-pbar-note">iPhone：按「列印／存成 PDF」→ 右上角分享鍵 →「儲存到檔案」。若按了沒有反應（從主畫面開的 App），請改用 Safari 打開網站再試。</p>`;
+      document.body.append(bar);
+      $("dPrintGo").addEventListener("click", printNow);
+      $("dPrintClose").addEventListener("click", () => { document.body.classList.remove("d-previewing"); window.scrollTo(0, previewScroll); });
+    }
+    previewScroll = window.scrollY;
+    document.body.classList.add("d-previewing");
+    $("dPrint").scrollTop = 0;
+  }
+  let previewScroll = 0;
 
   /* ═════ 事件 ═════ */
   function bind() {
