@@ -12,6 +12,23 @@ def inline(match):
     return "<script>\n" + code + "\n</script>"
 
 html = re.sub(r'<script defer src="([^"]+)"></script>', inline, html)
+# 圖片辨識引擎包進單機版（直接開檔案時不能另外載入檔案）
+import json
+ocr = os.path.join(ROOT, "vendor", "ocr")
+if os.path.exists(os.path.join(ocr, "chi_tra.traineddata.gz")):
+    rd = lambda n: open(os.path.join(ocr, n), encoding="utf-8").read()
+    emb = {"worker": rd("worker.min.js"), "core": rd("tesseract-core-simd-lstm.wasm.js"),
+           "lang": base64.b64encode(open(os.path.join(ocr, "chi_tra.traineddata.gz"), "rb").read()).decode()}
+    lib = rd("tesseract.min.js")
+    for k, v in [("worker", emb["worker"]), ("core", emb["core"]), ("lib", lib)]:
+        assert "</script" not in v.lower(), k
+    block = "<script>\n" + lib + "\n</script>\n<script>window.__OCR_EMBED=" + json.dumps(emb) + ";</script>\n"
+    j = html.rfind("</body>")   # 用最後一個：Excel 元件的程式碼裡也有「</body>」字樣
+    assert j > 0, "找不到 </body>"
+    html = html[:j] + block + html[j:]
+    assert "__OCR_EMBED" in html, "找不到 </body>，無法加入辨識引擎"
+else:
+    print("（vendor/ocr 沒有辨識引擎，單機版不含圖片辨識）")
 # 單機版不需要 PWA 相關設定
 html = re.sub(r'<script>if \("serviceWorker".*?</script>\n?', "", html)
 html = re.sub(r'<link rel="manifest"[^>]*>\n?', "", html)

@@ -209,7 +209,8 @@
         const old = reports[rid], t = x => String(x.updatedAt || x.savedAt || "");
         if (!old || t(r) > t(old)) reports[rid] = r;
       });
-      dorm.byCohort[id] = Object.assign({}, mine, mine.rooms && mine.rooms.length ? {} : {roomsText: c.roomsText || "", rooms: c.rooms || []}, {reports});
+      const hasRooms = (mine.rooms && mine.rooms.length) || (mine.roomsHistory && mine.roomsHistory.length);
+      dorm.byCohort[id] = Object.assign({}, mine, hasRooms ? {} : {roomsText: c.roomsText || "", rooms: c.rooms || [], roomsHistory: c.roomsHistory || undefined, building: mine.building || c.building || undefined}, {reports});
     });
     out.dorm = dorm;
     return out;
@@ -370,7 +371,7 @@
   /* ═══════════ 內務分頁的介面 ═══════════
      內務檢查存檔時，個人優缺點會轉成加扣分紀錄（src 標記來源，取代同一天的檢查時一併更新）。 */
   const dormBridge = {
-    Store, activeCohort, download,
+    Store, activeCohort, otherCohorts, download,
     pointsOptions: () => (pTpl ? pTpl.options : null),
     countPoints: src => pRecords.filter(r => r.src === src).length,
     replacePoints(src, records) {

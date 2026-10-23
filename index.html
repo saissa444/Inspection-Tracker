@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>學生加扣分・獎懲登錄</title>
-<link rel="manifest" href="./manifest.webmanifest?v=20261023e">
+<link rel="manifest" href="./manifest.webmanifest?v=20261023h">
 <meta name="theme-color" content="#526a85">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="加扣分獎懲">
-<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261023e">
+<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261023h">
 <style>
 :root{--ink:#3b3a37;--muted:#6e6862;--line:#e4ded5;--bg:#f1eee9;--card:#fff;--brand:#526a85;--brand-2:#5d7893;--soft:#edf0f3;--err:#9c5454;--ok:#557357;--warn:#8a6538;--cohort:#526a85;font-family:system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;color:var(--ink);background:var(--bg)}
 *{box-sizing:border-box}
@@ -348,6 +348,21 @@ button.d-small{min-height:36px;padding:6px 12px;font-size:14px;margin:4px 0}
 .d-map{min-width:0}
 .d-filebtn{margin:8px 8px 4px 0}
 .d-export{display:inline-flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.d-imghelp{margin-top:8px;font-size:14px}
+.d-bld{align-items:center;gap:6px 10px;flex-wrap:wrap;margin:4px 0 8px}
+.d-bld select{width:auto;min-width:150px;margin:0}
+.d-vers{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0}
+#dRoomsBtns{align-items:center;flex-wrap:wrap;gap:6px 10px}
+#dRoomsBtns input[type=date]{width:auto;margin:0 4px}
+.d-ocr-row{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;margin:0 0 6px}
+.d-ocr-row .d-ocrbtn{margin:0}
+.d-ocrbtn.busy{opacity:.6;pointer-events:none}
+.d-ocrprev{margin:6px 0 8px}
+.d-ocrprev summary{cursor:pointer;color:var(--brand);font-weight:600;font-size:14px}
+.d-ocrprev img{display:block;max-width:100%;max-height:420px;margin-top:6px;border:1px solid var(--line);border-radius:8px;object-fit:contain;background:#fff}
+.d-imghelp summary{cursor:pointer;color:var(--brand);font-weight:600}
+.d-imghelp ul{margin:6px 0;padding-left:20px}
+.d-imghelp li{margin:4px 0;line-height:1.55}
 #dPrint{display:none}
 #dPrintBar{display:none}
 #dPrint{color:#000;font-size:10.5pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -762,11 +777,12 @@ dialog::backdrop{background:rgba(60,52,44,.4);backdrop-filter:blur(3px);-webkit-
 })();
 </script>
 <script defer src="./vendor/xlsx.full.min.js?v=0.20.3"></script>
-<script defer src="./js/core.js?v=20261023e"></script>
-<script defer src="./js/store.js?v=20261023e"></script>
-<script defer src="./js/dorm-core.js?v=20261023e"></script>
-<script defer src="./js/dorm.js?v=20261023e"></script>
-<script defer src="./js/app.js?v=20261023e"></script>
+<script defer src="./js/core.js?v=20261023h"></script>
+<script defer src="./js/store.js?v=20261023h"></script>
+<script defer src="./js/dorm-core.js?v=20261023h"></script>
+<script defer src="./js/ocr.js?v=20261023h"></script>
+<script defer src="./js/dorm.js?v=20261023h"></script>
+<script defer src="./js/app.js?v=20261023h"></script>
 <script>if ("serviceWorker" in navigator && location.protocol === "https:") window.addEventListener("load", function () { navigator.serviceWorker.register("./sw.js").catch(function () {}); });</script>
 </body>
 </html>

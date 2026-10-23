@@ -13,7 +13,7 @@
   let draft = null, pendingOverwrite = false;   // pendingOverwrite：同一天已有檢查，等使用者選「另外新增」或「取代」
   let sub = "entry", month = null;
   const q = {from: null, to: null, room: "", person: "", view: "room", sort: {k: "s", dir: 1}, rsort: {k: "t", dir: -1}};
-  let idxCache = {id: null, idx: null}, bound = false, roomsEditing = false;   // roomsEditing：寢室名單已存過時，要按「重新輸入」才能改
+  let idxCache = {id: null, idx: null}, bound = false, roomsEditing = false, roomsView = null, roomsEditFrom = null;   // roomsEditing：寢室名單已存過時，要按「重新輸入」才能改
 
   /* ───── 資料 ───── */
   const cohort = () => B && B.activeCohort();
@@ -25,7 +25,10 @@
   function index() {
     const c = cohort();
     if (!c) return D.studentIndex([]);
-    if (idxCache.id !== c.id || idxCache.n !== c.students.length) idxCache = {id: c.id, n: c.students.length, idx: D.studentIndex(c.students)};
+    // 建制隊號（6 碼）也會對照其他期別的名冊：一則公告裡可能有別期的同學
+    const others = (B.otherCohorts ? B.otherCohorts() : []).map(o => ({label: o.label, students: o.students || []}));
+    const sig = c.id + "|" + c.students.length + "|" + others.map(o => o.label + ":" + o.students.length).join(",");
+    if (idxCache.sig !== sig) idxCache = {id: c.id, sig, idx: D.studentIndex(c.students, others)};
     return idxCache.idx;
   }
   const reportsList = () => { const cd = cdata(); return cd ? Object.entries(cd.reports).map(([id, r]) => Object.assign(r, {id})).sort((a, b) => a.date.localeCompare(b.date) || String(a.savedAt).localeCompare(String(b.savedAt))) : []; };
@@ -36,9 +39,93 @@
   const hhmm = t => { const d = new Date(t); return isNaN(d) ? "" : String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
   const nthLabel = r => { const list = sameDay(r.date); return list.length > 1 ? `第 ${list.indexOf(list.find(x => x.id === r.id)) + 1} 次` : ""; };
   const stu = k => index().get(k);
-  const who = k => { if (k[0] === "?") return k.slice(1); const s = stu(k); return s ? (s.female || s.team) : k; };
-  const nameOf = k => { const s = stu(k); return s ? s.name : ""; };
-  const memberMap = () => { const m = new Map(); (cdata() || {rooms: []}).rooms.forEach(r => r.members.forEach(k => m.set(k, r.room))); return m; };
+  const otherOf = k => index().otherCohort ? index().otherCohort(k) : null;   // 別期同學：回傳期別名稱
+  // 別期同學一律顯示建制隊號（女生隊號各期會重複）
+  const who = k => { if (k[0] === "?") return k.slice(1); const s = stu(k); return s ? (otherOf(k) ? s.team : (s.female || s.team)) : k; };
+  const nameOf = k => { const s = stu(k); return s ? s.name + (otherOf(k) ? "（" + otherOf(k) + "）" : "") : ""; };
+  /* ═════ 棟別、寢室名單版本（換寢、外派） ═════
+     每一期：building＝這一期住的棟（"育"＝育才樓、"樂"＝樂群樓），寢室號沒寫棟名時就算這一棟；
+     roomsHistory＝[{from, text, rooms}]，from 是開始適用的日期（空字串＝一開始就適用）。
+     某一天用 from ≤ 那天的最後一份；比第一份還早的日子用第一份。
+     外派：同學寫在別期（別棟）的名單裡，那段期間就不算在原本期別的寢室。 */
+  const BNAME = D.BUILDING_NAMES;
+  function buildingOfCohort(cd) {
+    if (!cd) return "育";
+    if (cd.building) return cd.building;
+    const v = versionsOf(cd), k = v.length ? v[v.length - 1].rooms.map(r => D.buildingOf(r.room)).find(Boolean) : "";
+    return k || "育";
+  }
+  const curBuilding = () => buildingOfCohort(cdata());
+  function versionsOf(cd) {
+    if (!cd) return [];
+    if (Array.isArray(cd.roomsHistory) && cd.roomsHistory.length) return cd.roomsHistory;
+    return cd.rooms && cd.rooms.length ? [{from: "", text: cd.roomsText || "", rooms: cd.rooms}] : [];
+  }
+  function versionAt(cd, date) {
+    const vs = versionsOf(cd);
+    if (!vs.length) return null;
+    let v = vs[0];
+    for (const x of vs) if (!x.from || x.from <= date) v = x;
+    return v;
+  }
+  // 存一份名單版本（同一天開始的就取代），cd.rooms／roomsText 保持「今天適用」的那一份
+  function setRoomsVersion(cd, from, text, rooms) {
+    const vs = versionsOf(cd).filter(v => v.from !== from).concat({from, text, rooms});
+    vs.sort((a, b) => a.from.localeCompare(b.from));
+    cd.roomsHistory = vs;
+    const cur = versionAt(cd, D.todayStr());
+    cd.roomsText = cur ? cur.text : ""; cd.rooms = cur ? cur.rooms : [];
+  }
+  function deleteRoomsVersion(cd, from) {
+    cd.roomsHistory = versionsOf(cd).filter(v => v.from !== from);
+    const cur = versionAt(cd, D.todayStr());
+    cd.roomsText = cur ? cur.text : ""; cd.rooms = cur ? cur.rooms : [];
+  }
+  // 某位同學在某一天，是不是寫在其他期別（別棟）的寢室名單裡 → 外派
+  function placedElsewhere(k, date) {
+    for (const o of (B.otherCohorts ? B.otherCohorts() : [])) {
+      const v = versionAt(data.byCohort[o.id], date);
+      if (!v) continue;
+      const r = v.rooms.find(x => x.members.includes(k));
+      if (r) return {cohort: o, room: r.room, from: v.from};
+    }
+    return null;
+  }
+  // 依日期查寢室：roomsAt(日期)、roomOf(學籍號碼, 日期)、mapAt(日期)
+  function makeResolver() {
+    const cd = cdata(), own = new Set((cohort().students || []).map(s => s.school));
+    const memo = new Map(), maps = new Map(), away = new Map();
+    const isAway = (k, date) => { const key = k + "|" + date; if (!away.has(key)) away.set(key, own.has(k) && !!placedElsewhere(k, date)); return away.get(key); };
+    const roomsAt = date => {
+      if (!memo.has(date)) {
+        const v = versionAt(cd, date);
+        memo.set(date, v ? v.rooms.map(r => ({room: r.room, members: r.members.filter(k => !isAway(k, date))})) : []);
+      }
+      return memo.get(date);
+    };
+    const mapAt = date => {
+      if (!maps.has(date)) { const m = new Map(); roomsAt(date).forEach(r => r.members.forEach(k => m.set(k, r.room))); maps.set(date, m); }
+      return maps.get(date);
+    };
+    return {roomsAt, mapAt, roomOf: (k, date) => mapAt(date).get(k) || null};
+  }
+  const memberMap = date => makeResolver().mapAt(date || D.todayStr());
+  // 3 碼女生隊號各期會重複：先看「那天住在這棟樓」的人（含外派進來的別期同學，扣掉外派出去的本期同學）
+  function normAt(date) {
+    const base = index().norm, here = new Map();
+    const add = (n, k) => { if (!here.has(n)) here.set(n, []); if (!here.get(n).includes(k)) here.get(n).push(k); };
+    for (const s of cohort().students || []) if (s.female && !placedElsewhere(s.school, date)) add(String(parseInt(s.female, 10)), s.school);
+    const v = versionAt(cdata(), date);
+    if (v) v.rooms.forEach(r => r.members.forEach(k => { const s = stu(k); if (s && s.female && otherOf(k)) add(String(parseInt(s.female, 10)), k); }));
+    return t => {
+      if (/^\d{1,3}$/.test(t)) {
+        const list = here.get(String(parseInt(t, 10))) || [];
+        if (list.length === 1) return list[0];
+        if (list.length > 1) return "?" + t + "（兩期同號）";
+      }
+      return base(t);
+    };
+  }
   let saveTimer = null;
   function save() { clearTimeout(saveTimer); saveTimer = setTimeout(() => B.Store.setJSON("dorm", data).catch(e => console.warn("內務資料儲存失敗", e)), 200); }
   const flush = () => { clearTimeout(saveTimer); return B.Store.setJSON("dorm", data); };
@@ -56,10 +143,21 @@
     <div data-pane="entry">
       <section>
         <div class="label-row"><h2 style="margin:0">貼上內務公告</h2><span class="copy-group"><button type="button" id="dRawCopy" class="copy-btn secondary" aria-label="複製公告內容">複製</button><button type="button" id="dRawPaste" class="copy-btn secondary" aria-label="貼上剪貼簿內容">貼上</button><button type="button" id="dRawClear" class="copy-btn secondary clear-btn" aria-label="清空公告內容">清空</button></span></div>
-        <div class="input-cohort">對象：<span class="cohort-tag active-cohort-tag"></span>（用這一期的名冊辨識女生隊號、建制隊號）</div>
+        <div class="d-ocr-row"><label class="button secondary d-ocrbtn" id="dOcrBtn">📷 從圖片辨識<input type="file" id="dOcrFile" accept="image/*" hidden></label><span id="dOcrMsg" class="note" role="status" aria-live="polite"></span></div>
+        <details id="dOcrPreview" class="d-ocrprev" open hidden><summary>對照圖片（核對用，不會存起來）</summary><img id="dOcrImg" alt="公告圖片"></details>
+        <div class="input-cohort">對象：<span class="cohort-tag active-cohort-tag"></span>（用這一期的名冊辨識女生隊號、建制隊號；建制隊號也會對照其他期別）</div>
         <textarea id="dRaw" style="min-height:180px" placeholder="把 LINE 上的內務檢查公告整則貼上，例如：&#10;1151019內務檢查&#10;被優：002 003&#10;棉被不潔 088 444194&#10;公物&#10;窗溝不潔 育五7、6-2"></textarea>
         <div id="dQuickSlot"></div>
-        <p class="note">「公物」那一行以下算公區（寫寢室號），以上算個人（寫女生隊號或建制隊號）。項目名稱有「優、整潔、整齊、乾淨」算加分，其他算扣分，點分數標籤可以改。</p>
+        <p class="note">「公物」那一行以下算公區（寫寢室號），以上算個人（寫女生隊號或建制隊號）。項目後面有標「(+0.2)」「(-0.2)」就照標示；標「(寢室記大X)」算那間寢室的公區缺點。沒有標示時，項目名稱有「優、整潔、整齊、乾淨」算加分，其他算扣分。點分數標籤可以改。</p>
+        <details class="d-imghelp"><summary>公告是圖片？</summary>
+          <p class="note">按上方「📷 從圖片辨識」選圖片，App 會自己辨識（第一次使用要下載約 6 MB 的辨識資料，之後不用網路）。如果辨識不理想，也可以用手機或電腦內建的文字辨識：</p>
+          <ul>
+            <li><b>iPhone</b>：LINE 的圖片先「儲存」到照片，在「照片」打開，長按圖上的文字 →「全選」→「拷貝」，回到這裡按「貼上」。</li>
+            <li><b>Mac</b>：用「預覽程式」或「照片」打開圖片，直接拖曳選取文字（或 ⌘A）→ ⌘C，回到這裡貼上。</li>
+            <li><b>Windows 11</b>：按 Win＋Shift＋S 截取圖片範圍 → 點跳出的通知開啟「剪取工具」→ 按「文字動作」→「複製所有文字」，回到這裡貼上（需要較新版的剪取工具）。</li>
+          </ul>
+          <p class="note">辨識完請對照圖片看一下下方的辨識結果：找不到的號碼會標出來，可能是圖上寫錯或辨識錯。</p>
+        </details>
       </section>
       <section id="dPreview" hidden>
         <div class="h2-row"><h2>辨識結果</h2></div>
@@ -110,7 +208,9 @@
     <div data-pane="rooms" hidden>
       <section>
         <div class="h2-row"><h2>寢室名單</h2><span class="note" id="dRoomCount"></span></div>
-        <p class="note">一行一間寢室：先寫寢室號，再寫住在裡面同學的女生隊號或建制隊號。例：5-7 002 003 007 010。寢室號寫「育五7」或「5-7」都可以。每一期各自一份名單。</p>
+        <div class="d-row d-bld"><label class="d-inline" for="dBuilding">這一期住</label><select id="dBuilding"><option value="育">育才樓（育）</option><option value="樂">樂群樓（樂）</option></select><span class="note">寢室號沒寫棟名時（例如 5-3），就算這一棟。</span></div>
+        <p class="note">一行一間寢室：先寫寢室號，再寫住在裡面同學的女生隊號或建制隊號。例：5-7 002 003 007 010。每一期各自一份名單。<br>外派來住的別期同學，請寫 6 碼建制隊號（例如 5-3 002 003 451271），App 會自動算成外派：那段期間他算在這裡的寢室，不算回原本期別。<br>有人換寢或外派時，按「換寢／外派：從某天起用新名單」，以前的檢查仍照當時的名單算。</p>
+        <div id="dRoomsVers" class="d-vers"></div>
         <textarea id="dRoomsText" style="min-height:220px" placeholder="5-1 001 002 003 004&#10;5-7 005 006 007 008"></textarea>
         <div class="d-row" id="dRoomsBtns"></div>
         <div id="dRoomsInfo"></div>
@@ -154,8 +254,9 @@
   function buildDraft() {
     const raw = $("dRaw").value;
     if (!raw.trim()) { draft = null; renderDraft(); return; }
-    const p = D.parseReport(raw, index().norm);
-    const prevDate = draft && draft.dateEdited ? draft.date : null;
+    const prevDate = draft && draft.dateEdited ? draft.date : null, b = curBuilding();
+    const p0 = D.parseReport(raw, index().norm, undefined, b);
+    const p = D.parseReport(raw, normAt(prevDate || p0.date || D.todayStr()), undefined, b);
     draft = {raw, date: prevDate || p.date || D.todayStr(), dateFound: !!p.date, dateEdited: !!prevDate, items: p.items, ignored: p.ignored, floor: p.floor};
     pendingOverwrite = false;
     renderDraft();
@@ -164,7 +265,7 @@
   function pointsPreview() {
     const c = cohort();
     if (!draft || !c) return null;
-    return D.pointsFromReport({date: draft.date, items: draft.items}, c, data.mapping, stu);
+    return D.pointsFromReport({date: draft.date, items: draft.items}, c, data.mapping, stu, otherOf);
   }
 
   function renderDraft() {
@@ -176,12 +277,12 @@
     // 手機的瀏覽器常常不顯示下拉建議，所以另外列出曾經輸入過的檢查人，點一下就填入
     const cur = $("dInsp").value.trim();
     $("dInspChips").innerHTML = data.inspectors.length ? `<span class="note">點選檢查人：</span>` + data.inspectors.map(n => `<button type="button" class="d-pick${n === cur ? " on" : ""}" data-pickinsp="${esc(n)}">${esc(n)}</button>`).join("") : "";
-    const mm = memberMap(), cd = cdata(), known = new Set(cd.rooms.map(r => r.room));
+    const R = makeResolver(), rsNow = R.roomsAt(draft.date), mm = R.mapAt(draft.date), known = new Set(rsNow.map(r => r.room)), hasRooms = rsNow.length > 0;
     const pItems = draft.items.filter(i => i.scope === "p"), gItems = draft.items.filter(i => i.scope === "g");
     const row = (it, idx) => {
       const unit = it.scope === "p" ? 0.2 : 1;
       const chips = it.targets.map(t => {
-        const unk = it.scope === "p" ? (t[0] === "?" || (cd.rooms.length && !mm.has(t))) : (cd.rooms.length && !known.has(t));
+        const unk = it.scope === "p" ? (t[0] === "?" || (hasRooms && !mm.has(t) && !otherOf(t))) : (hasRooms && !known.has(t));
         const lab = it.scope === "p" ? esc(who(t)) + (nameOf(t) ? " " + esc(nameOf(t)) : "") + (mm.has(t) ? ` <small>${esc(RL(mm.get(t)))}</small>` : "") : esc(RL(t));
         const nt = it.notes && it.notes[t] ? `<small>（${esc(it.notes[t])}）</small>` : "";
         return `<span class="d-chip${unk ? " unk" : ""}">${lab}${nt}</span>`;
@@ -195,20 +296,31 @@
     if (!draft.items.length) html = `<p class="note">沒有辨識到任何項目。請確認每一行是「項目名稱 號碼 號碼…」的格式。</p>`;
     $("dItems").innerHTML = html;
 
-    const warns = [];
+    const warns = [], info = [];
     const notStu = Array.from(new Set(pItems.flatMap(i => i.targets).filter(t => t[0] === "?")));
-    if (notStu.length) warns.push(`這一期名冊裡沒有這些號碼：${notStu.map(t => t.slice(1)).join("、")}`);
-    if (!cd.rooms.length) warns.push("還沒設定寢室名單，個人分數會記下來，但要到「寢室名單與設定」設定後才能算進寢室總分。");
+    const twin = notStu.filter(t => /（兩期同號）$/.test(t)), lost = notStu.filter(t => !/（兩期同號）$/.test(t));
+    if (twin.length) warns.push(`這些女生隊號，兩期都有同學住在這棟樓，分不出是誰，請改寫 6 碼建制隊號：${twin.map(t => t.slice(1).replace("（兩期同號）", "")).join("、")}`);
+    if (lost.length) warns.push(`名冊裡找不到這些號碼：${lost.map(t => t.slice(1)).join("、")}`);
+    const badNums = Array.from(new Set(pItems.concat(gItems).flatMap(i => i.bad).filter(b => /^\d+$/.test(b))));
+    if (badNums.length) warns.push(`號碼位數不對（可能打錯或辨識錯）：${badNums.join("、")}`);
+    const guests = Array.from(new Set(pItems.flatMap(i => i.targets).filter(t => t[0] !== "?" && otherOf(t))));
+    if (guests.length) {
+      const byC = {}; guests.forEach(t => { (byC[otherOf(t)] = byC[otherOf(t)] || []).push(t); });
+      info.push(Object.entries(byC).map(([c, ts]) => `${c} ${ts.length} 位`).join("、") + `：算在這一期（${cohort().label}）的內務統計，加扣分歸到他們自己的期別。`);
+    }
+    if (!hasRooms) warns.push("還沒設定寢室名單，個人分數會記下來，但要到「寢室名單與設定」設定後才能算進寢室總分。");
     else {
-      const unkS = Array.from(new Set(pItems.flatMap(i => i.targets).filter(t => t[0] !== "?" && !mm.has(t))));
+      const unkS = Array.from(new Set(pItems.flatMap(i => i.targets).filter(t => t[0] !== "?" && !mm.has(t) && !otherOf(t))));
       const unkR = Array.from(new Set(gItems.flatMap(i => i.targets).filter(t => !known.has(t))));
-      if (unkS.length) warns.push(`還沒分配寢室：${unkS.map(t => who(t) + " " + nameOf(t)).join("、")}（虛線框）`);
+      const awayS = unkS.filter(t => placedElsewhere(t, draft.date)), noRoom = unkS.filter(t => !placedElsewhere(t, draft.date));
+      if (awayS.length) warns.push(`這天外派住在別棟：${awayS.map(t => { const a = placedElsewhere(t, draft.date); return who(t) + " " + nameOf(t) + "（" + BNAME[D.buildingOf(a.room)] + " " + RL(a.room) + "）"; }).join("、")}；分數照記，但不算進這一期的寢室。`);
+      if (noRoom.length) warns.push(`還沒分配寢室：${noRoom.map(t => who(t) + " " + nameOf(t)).join("、")}（虛線框）`);
       if (unkR.length) warns.push(`寢室名單裡沒有這些寢室：${unkR.map(RL).join("、")}`);
     }
     if (!draft.dateFound && !draft.dateEdited) warns.push("公告裡沒有讀到日期，先填今天，請確認檢查日期。");
     if (draft.floor && draft.floor.length) warns.push(`樓層公共區域（不屬於任何寢室，不計分）：${draft.floor.join("／")}`);
     if (draft.ignored.length) warns.push(`略過的文字：${draft.ignored.join("／")}`);
-    $("dWarn").innerHTML = warns.map(w => `<div class="status warning">${esc(w)}</div>`).join("");
+    $("dWarn").innerHTML = info.map(w => `<div class="status">${esc(w)}</div>`).join("") + warns.map(w => `<div class="status warning">${esc(w)}</div>`).join("");
 
     const pv = pointsPreview(), plus = pv.records.filter(r => r.kind === "加分").length, minus = pv.records.length - plus;
     const needMap = pItems.length && (!data.mapping || !data.mapping.plus && pItems.some(i => i.sign > 0) || !data.mapping.minus && pItems.some(i => i.sign < 0));
@@ -247,7 +359,7 @@
     cd.reports[id] = report;
     let note = "";
     if (data.autoPoints && B.pointsOptions()) {
-      const pv = D.pointsFromReport(report, c, data.mapping, stu);
+      const pv = D.pointsFromReport(report, c, data.mapping, stu, otherOf);
       pv.records.forEach(r => { r.src = srcOf(id); });
       const removed = B.replacePoints(srcOf(id), pv.records);
       note = pv.records.length ? `，並在「加扣分」新增 ${pv.records.length} 筆紀錄` + (removed ? `（取代原本 ${removed} 筆）` : "") : "";
@@ -255,7 +367,7 @@
     }
     try { await flush(); } catch (e) { msg("dEntryMsg", "儲存失敗：" + e.message, "error"); return; }
     month = report.date.slice(0, 7);
-    $("dRaw").value = ""; $("dInsp").value = ""; draft = null; pendingOverwrite = false;
+    $("dRaw").value = ""; $("dInsp").value = ""; draft = null; pendingOverwrite = false; ocrReset();
     renderDraft();
     const nth = sameDay(report.date).length;
     msg("dEntryMsg", `已儲存 ${report.date} ${nth > 1 ? ` 第 ${sameDay(report.date).findIndex(r => r.id === id) + 1} 次` : ""}內務檢查${note}。`, "ok");
@@ -271,14 +383,14 @@
     const ms = months();
     if (!month || !ms.includes(month)) month = ms.find(m => reportsList().some(r => r.date.startsWith(m))) || ms[0];
     $("dMonth").innerHTML = ms.map(m => `<option value="${m}" ${m === month ? "selected" : ""}>${D.rocMonth(m)}</option>`).join("");
-    const [from, to] = D.monthRange(month), S = D.summarize(reportsList(), cdata().rooms, from, to);
+    const [from, to] = D.monthRange(month), S = D.summarize(reportsList(), makeResolver(), from, to);
     const w = [];
     if (!S.reportCount) w.push(["warning", `${D.rocMonth(month)}還沒有檢查紀錄。到「登錄公告」貼上 LINE 公告就會開始統計。`]);
     else w.push(["ok", `本月共 ${S.reportCount} 次檢查。`]);
-    if (!cdata().rooms.length && S.reportCount) w.push(["warning", "尚未設定寢室名單，寢室總分目前只有公區分數。"]);
+    if (!versionsOf(cdata()).length && S.reportCount) w.push(["warning", "尚未設定寢室名單，寢室總分目前只有公區分數。"]);
     $("dStatsWarn").innerHTML = w.map(([k, t]) => `<div class="status ${k}">${esc(t)}</div>`).join("");
     const chips = (rs, pred) => {
-      const list = rs.flatMap(r => r.members.map(k => { const p = S.people.get(k) || {score: 0, plus: 0, minus: 0}; return {k, s: p.score, p}; })).filter(x => pred(x.s, x.p));
+      const list = rs.flatMap(r => r.members.map(k => { const p = (r.memberScores ? r.memberScores.get(k) : S.people.get(k)) || {score: 0, plus: 0, minus: 0}; return {k, s: p.score, p}; })).filter(x => pred(x.s, x.p));
       return list.length ? list.map(x => `<span class="d-chip">${esc(who(x.k))} ${esc(nameOf(x.k))} <b class="${tone(x.s)}">${fmt(x.s)}</b></span>`).join("") : `<span class="note">沒有</span>`;
     };
     const card = (cls, lab, rs, listLab, pred) => `<div class="d-vcard ${cls}"><div class="d-vlab">${lab}</div>` +
@@ -292,8 +404,8 @@
         : `<tr><td colspan="5" class="note">設定寢室名單後，這裡會列出全部寢室。</td></tr>`) + `</tbody>`;
   }
   function monthText() {
-    const [from, to] = D.monthRange(month), S = D.summarize(reportsList(), cdata().rooms, from, to);
-    const names = (rs, pred) => rs.flatMap(r => r.members.map(k => { const p = S.people.get(k) || {score: 0, plus: 0, minus: 0}; return {k, s: p.score, p}; })).filter(x => pred(x.s, x.p)).map(x => who(x.k) + nameOf(x.k) + "(" + fmt(x.s) + ")").join("、") || "無";
+    const [from, to] = D.monthRange(month), S = D.summarize(reportsList(), makeResolver(), from, to);
+    const names = (rs, pred) => rs.flatMap(r => r.members.map(k => { const p = (r.memberScores ? r.memberScores.get(k) : S.people.get(k)) || {score: 0, plus: 0, minus: 0}; return {k, s: p.score, p}; })).filter(x => pred(x.s, x.p)).map(x => who(x.k) + nameOf(x.k) + "(" + fmt(x.s) + ")").join("、") || "無";
     const lines = [`${D.rocMonth(month)} 內務統計（共 ${S.reportCount} 次檢查）`];
     if (S.worst.length) lines.push(`最劣寢：${S.worst.map(r => RL(r.room)).join("、")}（${fmt(S.worst[0].total)}）`, `　負分同學：${names(S.worst, s => s < 0)}`);
     if (S.best.length) lines.push(`最優寢：${S.best.map(r => RL(r.room)).join("、")}（${fmt(S.best[0].total)}）`, `　無負分同學：${names(S.best, (s, p) => !p.minus)}`);
@@ -310,7 +422,10 @@
     const m = v.match(/\d+/);
     if (m) { const k = index().norm(m[0]); if (k && k[0] !== "?") return k; }
     const hit = (cohort().students || []).find(s => s.name && v.includes(s.name));
-    return hit ? hit.school : null;
+    if (hit) return hit.school;
+    const seen = new Set(reportsList().flatMap(r => (r.items || []).filter(i => i.scope === "p").flatMap(i => i.targets)));
+    const g = Array.from(seen).map(stu).find(s => s && s.name && v.includes(s.name));
+    return g ? g.school : null;
   }
   const extremes = (rows, keys) => { const X = {}; keys.forEach(k => { const v = rows.map(r => r[k]); X[k] = {max: Math.max(...v), min: Math.min(...v)}; }); return X; };
   const hlOf = (X, k, v, kind) => {
@@ -329,8 +444,11 @@
 
   /* 寢室總覽、個人總覽的資料（畫面和匯出共用，依目前的排序） */
   function roomRows(E) {
-    const rows = cdata().rooms.map(r => {
-      const pe = E.filter(e => e.scope === "p" && r.members.includes(e.target)), ge = E.filter(e => e.scope === "g" && e.target === r.room);
+    // 每一筆個人優缺點算進「檢查那天」他住的寢室（換寢、外派都照當時）
+    const R = makeResolver(), names = new Set(R.roomsAt(q.to).map(r => r.room));
+    E.forEach(e => { if (e.scope === "p") { const r = R.roomOf(e.target, e.date); if (r) names.add(r); } else if (R.roomsAt(e.date).some(x => x.room === e.target)) names.add(e.target); });
+    const rows = Array.from(names).map(room => ({room})).map(r => {
+      const pe = E.filter(e => e.scope === "p" && R.roomOf(e.target, e.date) === r.room), ge = E.filter(e => e.scope === "g" && e.target === r.room);
       const ps = pe.reduce((s, e) => s + D.pts(e), 0), gs = ge.reduce((s, e) => s + D.pts(e), 0);
       return {room: r.room, pp: pe.filter(e => e.sign > 0).length, pm: pe.filter(e => e.sign < 0).length, gp: ge.filter(e => e.sign > 0).length, gm: ge.filter(e => e.sign < 0).length, ps, gs, t: ps + gs};
     });
@@ -340,9 +458,12 @@
   }
   const rth = (k, label, r) => `<th class="${r ? "r " : ""}d-sortable" data-rsort="${k}">${label}${q.rsort.k === k ? (q.rsort.dir > 0 ? " ▲" : " ▼") : ""}</th>`;
   function personRows(E) {
-    const mm = memberMap();
-        const pr = (cohort().students || []).map(s => { const l = E.filter(e => e.scope === "p" && e.target === s.school);
-          return {k: s.school, f: s.female || s.team, name: s.name, room: mm.get(s.school) || "", plus: l.filter(e => e.sign > 0).length, minus: l.filter(e => e.sign < 0).length, s: l.reduce((a, e) => a + D.pts(e), 0)}; });
+    const mm = memberMap(q.to);
+        const mine = new Set((cohort().students || []).map(s => s.school));
+        const guests = Array.from(new Set(E.filter(e => e.scope === "p" && !mine.has(e.target) && e.target[0] !== "?" && stu(e.target)).map(e => e.target))).map(stu);
+        const pr = (cohort().students || []).concat(guests).map(s => { const l = E.filter(e => e.scope === "p" && e.target === s.school);
+          const aw = !mm.get(s.school) && !otherOf(s.school) ? placedElsewhere(s.school, q.to) : null;
+          return {k: s.school, f: who(s.school), name: nameOf(s.school), room: mm.get(s.school) || "", away: aw ? "外派：" + RL(aw.room) : "", plus: l.filter(e => e.sign > 0).length, minus: l.filter(e => e.sign < 0).length, s: l.reduce((a, e) => a + D.pts(e), 0)}; });
         const X = extremes(pr, ["plus", "minus", "s"]);
         const cmp = {f: (a, b) => a.f.localeCompare(b.f, "zh-Hant", {numeric: true}), name: (a, b) => a.name.localeCompare(b.name, "zh-Hant"), room: (a, b) => a.room.localeCompare(b.room, "zh-Hant", {numeric: true}),
           plus: (a, b) => a.plus - b.plus, minus: (a, b) => a.minus - b.minus, s: (a, b) => a.s - b.s}[q.sort.k];
@@ -353,8 +474,8 @@
   function renderQuery() {
     if (!q.from) [q.from, q.to] = relMonth(0);
     $("qFrom").value = q.from; $("qTo").value = q.to;
-    const cd = cdata(), mm = memberMap(), students = cohort().students || [];
-    $("qRoom").innerHTML = `<option value="">全部（總覽）</option>` + cd.rooms.map(r => `<option value="${esc(r.room)}" ${r.room === q.room ? "selected" : ""}>${esc(RL(r.room))}</option>`).join("");
+    const R = makeResolver(), mm = R.mapAt(q.to), students = cohort().students || [];
+    $("qRoom").innerHTML = `<option value="">全部（總覽）</option>` + R.roomsAt(q.to).map(r => `<option value="${esc(r.room)}" ${r.room === q.room ? "selected" : ""}>${esc(RL(r.room))}</option>`).join("");
     $("qPeople").innerHTML = students.map(s => `<option value="${esc((s.female || s.team) + " " + s.name)}"></option>`).join("");
     const E = D.entries(reportsList(), q.from, q.to);
     const range = q.from.replace(/-/g, "/") + " – " + q.to.replace(/-/g, "/");
@@ -365,13 +486,14 @@
       const k = resolvePerson(q.person);
       if (!k) { $("qOut").innerHTML = `<div class="status warning">這一期名冊裡找不到「${esc(q.person)}」。</div>`; return; }
       const mine = E.filter(e => e.scope === "p" && e.target === k), sc = mine.reduce((s, e) => s + D.pts(e), 0);
-      h = `<section><div class="h2-row"><h2>${esc(who(k))} ${esc(nameOf(k))}</h2><span class="note">${mm.has(k) ? esc(RL(mm.get(k))) : "未分配寢室"}・${range}</span></div>
+      h = `<section><div class="h2-row"><h2>${esc(who(k))} ${esc(nameOf(k))}</h2><span class="note">${mm.has(k) ? esc(RL(mm.get(k))) : otherOf(k) ? esc(otherOf(k)) + "同學（不在這一期的寢室名單）" : placedElsewhere(k, q.to) ? "外派中：" + esc(BNAME[D.buildingOf(placedElsewhere(k, q.to).room)] + " " + RL(placedElsewhere(k, q.to).room)) : "未分配寢室"}・${range}</span></div>
         <div class="d-row">${stat("優點", mine.filter(e => e.sign > 0).length + " 項", "d-pos")}${stat("缺點", mine.filter(e => e.sign < 0).length + " 項", "d-neg")}${stat("分數", fmt(sc), tone(sc))}</div>
         <div class="d-tablewrap"><table class="d-table"><thead>${head}</thead><tbody>${entryRows(mine, false)}</tbody></table></div>
         ${mm.has(k) ? `<button type="button" class="secondary" data-goroom="${esc(mm.get(k))}">看${esc(RL(mm.get(k)))}的明細</button>` : ""}</section>`;
     } else if (q.room) {
-      const members = (cd.rooms.find(r => r.room === q.room) || {members: []}).members;
-      const pubE = E.filter(e => e.scope === "g" && e.target === q.room), memE = E.filter(e => e.scope === "p" && members.includes(e.target));
+      const memE = E.filter(e => e.scope === "p" && R.roomOf(e.target, e.date) === q.room);
+      const members = Array.from(new Set((R.roomsAt(q.to).find(r => r.room === q.room) || {members: []}).members.concat(memE.map(e => e.target))));
+      const pubE = E.filter(e => e.scope === "g" && e.target === q.room);
       const pubS = pubE.reduce((s, e) => s + D.pts(e), 0), memS = memE.reduce((s, e) => s + D.pts(e), 0);
       const mrows = members.map(k => { const l = memE.filter(e => e.target === k); return {k, plus: l.filter(e => e.sign > 0).length, minus: l.filter(e => e.sign < 0).length, s: l.reduce((a, e) => a + D.pts(e), 0)}; }).sort((a, b) => a.s - b.s);
       h = `<section><div class="h2-row"><h2>${esc(RL(q.room))}</h2><span class="note">${members.length} 人・${range}</span></div>
@@ -389,7 +511,7 @@
         h = `<section><div class="h2-row">${seg}<span class="note">${range}・${nRep} 次檢查</span>${exportBtns(q.view === "person" ? "people" : "rooms")}</div>
           <p class="note">${pr.length} 人：${pr.filter(r => r.plus).length} 人有優點、${pr.filter(r => r.minus).length} 人有缺點。點欄位名稱可以排序，點隊號看個人明細。${legend}</p>
           <div class="d-tablewrap"><table class="d-table"><thead><tr>${th("f", "隊號")}${th("name", "姓名")}${th("room", "寢室")}${th("plus", "優", 1)}${th("minus", "缺", 1)}${th("s", "分數", 1)}</tr></thead><tbody>${
-            pr.map(r => `<tr><td><a href="#" data-goperson="${esc(r.k)}">${esc(r.f)}</a></td><td>${esc(r.name)}</td><td>${r.room ? esc(RL(r.room)) : "—"}</td><td class="r ${hlOf(X, "plus", r.plus, "good")}">${r.plus}</td><td class="r ${hlOf(X, "minus", r.minus, "bad")}">${r.minus}</td><td class="r ${tone(r.s)} ${hlOf(X, "s", r.s)}">${fmt(r.s)}</td></tr>`).join("") || `<tr><td colspan="6" class="note">這一期名冊沒有學生。</td></tr>`}</tbody></table></div></section>`;
+            pr.map(r => `<tr><td><a href="#" data-goperson="${esc(r.k)}">${esc(r.f)}</a></td><td>${esc(r.name)}</td><td>${r.room ? esc(RL(r.room)) : r.away ? `<span class="note">${esc(r.away)}</span>` : "—"}</td><td class="r ${hlOf(X, "plus", r.plus, "good")}">${r.plus}</td><td class="r ${hlOf(X, "minus", r.minus, "bad")}">${r.minus}</td><td class="r ${tone(r.s)} ${hlOf(X, "s", r.s)}">${fmt(r.s)}</td></tr>`).join("") || `<tr><td colspan="6" class="note">這一期名冊沒有學生。</td></tr>`}</tbody></table></div></section>`;
       } else {
         const rows = roomRows(E);
         const X = rows.length ? extremes(rows, ["pp", "pm", "gp", "gm", "ps", "gs", "t"]) : {};
@@ -404,9 +526,18 @@
   }
 
   /* ═════ 寢室名單與設定 ═════ */
+  const fromLabel = f => f ? (+f.slice(5, 7)) + "/" + (+f.slice(8, 10)) + " 起" : "一開始起";
+  const fromLong = f => f ? f.replace(/-/g, "/") + " 起" : "一開始起（之前所有檢查都用這份）";
+  // 目前畫面上顯示的那一份名單（沒有指定就是今天適用的）
+  function shownVersion() {
+    const cd = cdata(), vs = versionsOf(cd);
+    return (roomsView !== null && vs.find(v => v.from === roomsView)) || versionAt(cd, D.todayStr());
+  }
   function renderRooms() {
     const cd = cdata();
-    if (document.activeElement !== $("dRoomsText")) $("dRoomsText").value = cd.roomsText;
+    $("dBuilding").value = curBuilding();
+    if (!roomsEditing && document.activeElement !== $("dRoomsText")) { const v = shownVersion(); $("dRoomsText").value = v ? v.text : (cd.roomsText || ""); }
+    renderRoomVersions();
     renderRoomsLock();
     roomsInfo();
     $("dAuto").checked = !!data.autoPoints;
@@ -422,22 +553,62 @@
     };
     $("dMapping").innerHTML = `<div class="grid">${block("plus", "加分", "優良")}${block("minus", "扣分", "不良")}</div>`;
   }
-  // 寢室名單存過之後鎖住，避免不小心改到；按「重新輸入寢室名單」才能編輯
+  // 換這一期住的棟：已存的名單和檢查紀錄裡的寢室一起改（5-3 ↔ 樂5-3），兩邊才對得上
+  async function changeBuilding(sel) {
+    const cd = cdata(), nb = sel.value, ob = curBuilding();
+    if (nb === ob) return;
+    const rk = key => /^[^\d]?\d{1,2}-\d{1,2}$/.test(key) ? (nb === "育" ? "" : nb) + key.replace(/^[^\d]/, "") : key;
+    const vs = versionsOf(cd), hasG = reportsList().some(r => (r.items || []).some(i => i.scope === "g" && i.targets.length));
+    if ((vs.length || hasG) && !confirm(`要把「${cohort().label}」改成住${BNAME[nb]}嗎？\n已存的寢室名單和檢查紀錄裡的寢室會一起改（例如 ${RL(ob === "育" ? "5-3" : ob + "5-3")} → ${RL(rk("5-3"))}）。`)) { sel.value = ob; return; }
+    cd.building = nb;
+    if (vs.length) cd.roomsHistory = vs.map(v => ({from: v.from, text: v.text, rooms: v.rooms.map(r => ({room: rk(r.room), members: r.members}))}));
+    Object.values(cd.reports).forEach(r => (r.items || []).forEach(i => {
+      if (i.scope !== "g") return;
+      i.targets = i.targets.map(rk);
+      if (i.notes) i.notes = Object.fromEntries(Object.entries(i.notes).map(([k, v]) => [rk(k), v]));
+    }));
+    const cur = versionAt(cd, D.todayStr());
+    if (cur) { cd.roomsText = cur.text; cd.rooms = cur.rooms; }
+    try { await flush(); } catch (err) { alert("儲存失敗：" + err.message); }
+    renderRooms();
+  }
+  function renderRoomVersions() {
+    const vs = versionsOf(cdata()), cur = versionAt(cdata(), D.todayStr()), shown = shownVersion();
+    $("dRoomsVers").innerHTML = vs.length ? `<span class="note">名單版本：</span>` + vs.map(v =>
+      `<button type="button" class="d-pick${shown && v.from === shown.from ? " on" : ""}" data-roomsver="${esc(v.from)}">${esc(fromLabel(v.from))}${cur && v.from === cur.from ? "（目前）" : ""}</button>`).join("") : "";
+  }
+  // 寢室名單存過之後鎖住，避免不小心改到；要改時選「修改這份名單」或「從某天起用新名單」
   function renderRoomsLock() {
-    const saved = !!cdata().rooms.length, locked = saved && !roomsEditing, ta = $("dRoomsText");
+    const cd = cdata(), vs = versionsOf(cd), saved = vs.length > 0, locked = saved && !roomsEditing, ta = $("dRoomsText");
     ta.readOnly = locked;
     ta.classList.toggle("d-locked", locked);
-    $("dRoomsBtns").innerHTML = locked
-      ? `<button type="button" class="secondary" id="dRoomsEdit">重新輸入寢室名單</button><span class="note">寢室名單已儲存並鎖定。</span>`
-      : `<button type="button" id="dRoomsSave">儲存寢室名單</button>` + (saved ? `<button type="button" class="secondary" id="dRoomsCancel">取消</button>` : "");
+    const shown = shownVersion(), cur = versionAt(cd, D.todayStr());
+    if (locked) {
+      $("dRoomsBtns").innerHTML = `<span class="note">正在看：${esc(fromLong(shown.from))}的名單${cur && shown.from === cur.from ? "（今天適用）" : ""}，已鎖定。</span>
+        <button type="button" class="secondary" id="dRoomsEdit">修改這份名單</button>
+        <button type="button" class="secondary" id="dRoomsNew">換寢／外派：從某天起用新名單</button>` +
+        (vs.length > 1 ? `<button type="button" class="danger d-small" id="dRoomsDelVer">刪除這份</button>` : "");
+      return;
+    }
+    const first = !saved, fromVal = roomsEditing === "new" ? D.todayStr() : (roomsEditFrom || "");
+    $("dRoomsBtns").innerHTML = `<label class="d-inline">這份名單從 <input type="date" id="dRoomsFrom" value="${esc(fromVal)}"> 起使用</label>
+      <span class="note">${first || !fromVal ? "日期留白＝之前所有檢查都用這份。" : "這一天以前的檢查仍照舊名單算。"}</span>
+      <button type="button" id="dRoomsSave">儲存寢室名單</button>` + (saved ? `<button type="button" class="secondary" id="dRoomsCancel">取消</button>` : "");
   }
   function roomsInfo() {
-    const {rooms, issues} = D.parseRooms($("dRoomsText").value, index().norm);
+    const {rooms, issues} = D.parseRooms($("dRoomsText").value, index().norm, curBuilding());
+    const shown = shownVersion(), date = roomsEditing ? ($("dRoomsFrom") && $("dRoomsFrom").value) || D.todayStr() : (shown && shown.from) || D.todayStr();
     const students = cohort().students || [], assigned = new Set(rooms.flatMap(r => r.members));
-    const left = students.filter(s => !assigned.has(s.school));
-    $("dRoomCount").textContent = rooms.length + " 間寢室";
+    // 外派：寫在別期（別棟）名單裡的本期同學；原本寢室的名單不用刪，那段期間自動不算在這裡
+    const away = students.map(s => ({s, a: placedElsewhere(s.school, date)})).filter(x => x.a);
+    const awaySet = new Set(away.map(x => x.s.school));
+    const left = students.filter(s => !assigned.has(s.school) && !awaySet.has(s.school));
+    const guests = rooms.flatMap(r => r.members.filter(k => otherOf(k)).map(k => ({k, room: r.room})));
+    $("dRoomCount").textContent = rooms.length + " 間寢室・" + BNAME[curBuilding()];
     let h = issues.length ? `<div class="status warning">${issues.map(esc).join("<br>")}</div>` : "";
-    if (students.length) h += `<div class="status ${left.length ? "warning" : "ok"}">名冊 ${students.length} 人，已分配寢室 ${students.length - left.length} 人${left.length ? `，還有 ${left.length} 人沒分配：${left.slice(0, 30).map(s => esc((s.female || s.team) + s.name)).join("、")}${left.length > 30 ? "…" : ""}` : ""}。</div>`;
+    if (students.length) h += `<div class="status ${left.length ? "warning" : "ok"}">名冊 ${students.length} 人，已分配寢室 ${students.length - left.length - away.length} 人${away.length ? `，外派 ${away.length} 人` : ""}${left.length ? `，還有 ${left.length} 人沒分配：${left.slice(0, 30).map(s => esc((s.female || s.team) + s.name)).join("、")}${left.length > 30 ? "…" : ""}` : ""}。</div>`;
+    if (away.length) h += `<div class="status">外派中（住在別棟，這段期間不算在本期寢室）：${away.map(x => esc(x.s.team + " " + x.s.name) + " → " + esc(BNAME[D.buildingOf(x.a.room)] + " " + RL(x.a.room)) + `<span class="note">（${esc(x.a.cohort.label)}名單，${esc(fromLabel(x.a.from))}）</span>`).join("、")}</div>`;
+    if (guests.length) h += `<div class="status">外派來住的別期同學：${guests.map(x => esc(who(x.k) + " " + nameOf(x.k)) + " 在 " + esc(RL(x.room))).join("、")}</div>`;
     $("dRoomsInfo").innerHTML = h;
   }
 
@@ -474,13 +645,47 @@
       cd.reports[key] = {date: r.date, inspector: r.inspector || "", raw: r.raw || "", savedAt: r.savedAt || new Date().toISOString(), items};
     }
     if (Array.isArray(d.rooms) && d.rooms.length) {
-      cd.roomsText = d.rooms.map(r => r.room + " " + r.members.join(" ")).join("\n");
-      cd.rooms = D.parseRooms(cd.roomsText, norm).rooms;
-      roomsEditing = false;
+      const text = d.rooms.map(r => r.room + " " + r.members.join(" ")).join("\n");
+      setRoomsVersion(cd, "", text, D.parseRooms(text, norm, buildingOfCohort(cd)).rooms);
+      roomsEditing = false; roomsView = null;
     }
     (d.inspectors || []).forEach(n => { if (n && !data.inspectors.includes(n)) data.inspectors.push(n); });
     await flush(); render();
     return {warn: miss.size > 0, message: `已把內務資料匯入「${cohort().label}」：${added + replaced} 次檢查（新增 ${added}、取代 ${replaced}）` + (d.rooms && d.rooms.length ? `和 ${d.rooms.length} 間寢室名單` : "") + "。這些舊紀錄不會轉入加扣分。" + (miss.size ? `名冊找不到的號碼已略過：${Array.from(miss).slice(0, 20).join("、")}` : "")};
+  }
+
+  /* ═════ 從圖片辨識（js/ocr.js） ═════ */
+  let ocrBusy = false, ocrUrl = null;
+  function ocrReset() {
+    if (ocrUrl) { URL.revokeObjectURL(ocrUrl); ocrUrl = null; }
+    if ($("dOcrPreview")) { $("dOcrPreview").hidden = true; $("dOcrImg").removeAttribute("src"); $("dOcrMsg").textContent = ""; }
+  }
+  async function runOcr(file) {
+    if (!file || ocrBusy) return;
+    const m = $("dOcrMsg"), btn = $("dOcrBtn");
+    if (!window.DormOCR) { m.textContent = "辨識元件沒有載入，請重新整理後再試。"; return; }
+    if (!/^image\//.test(file.type || "image/")) { m.textContent = "請選擇圖片檔。"; return; }
+    if ($("dRaw").value.trim() && !confirm("公告框裡已經有文字，要換成圖片辨識的結果嗎？")) return;
+    ocrBusy = true; btn.classList.add("busy"); m.textContent = "準備辨識…";
+    if (ocrUrl) URL.revokeObjectURL(ocrUrl);
+    ocrUrl = URL.createObjectURL(file); $("dOcrImg").src = ocrUrl; $("dOcrPreview").hidden = false; $("dOcrPreview").open = true;
+    const t0 = Date.now(), norm = index().norm;
+    // 用名冊檢查辨識出來的號碼：對得上的越多、看不懂的越少，就是越好的辨識結果
+    const score = text => {
+      const p = D.parseReport(text, norm, undefined, curBuilding()), t = p.items.flatMap(i => i.targets), known = t.filter(k => k[0] !== "?").length;
+      // 「未註明項目」通常代表某一行沒接上，整行的分數可能算錯，扣分加重
+      const orphan = p.items.filter(i => i.item === "未註明項目").reduce((n, i) => n + i.targets.length, 0);
+      return {known, problems: t.length - known + p.items.reduce((n, i) => n + i.bad.length, 0) + orphan * 3};
+    };
+    try {
+      const text = await window.DormOCR.recognize(file, score, (s, p) => { m.textContent = s + (p > 0 && p < 1 ? " " + Math.round(p * 100) + "%" : ""); });
+      if (!text.trim()) throw new Error("圖片裡沒有讀到文字");
+      $("dRaw").value = text;
+      $("dRaw").dispatchEvent(new Event("input", {bubbles: true}));
+      m.textContent = `辨識完成（${Math.max(1, Math.round((Date.now() - t0) / 1000))} 秒）。請對照圖片核對下方的辨識結果，再儲存。`;
+    } catch (e) {
+      m.textContent = "辨識失敗：" + (e && e.message ? e.message : e) + "。可以改用手機或電腦內建的文字辨識（見下方「公告是圖片？」）。";
+    } finally { ocrBusy = false; btn.classList.remove("busy"); }
   }
 
   // 複製公告框內容（和加扣分「輸入學生」旁的複製鍵一樣，方便貼到 LINE）
@@ -510,8 +715,8 @@
   function buildReport(kind) {
     const c = cohort(), stamp = D.todayStr();
     if (kind === "month") {
-      const [from, to] = D.monthRange(month), S = D.summarize(reportsList(), cdata().rooms, from, to);
-      const names = (rs, pred) => rs.flatMap(r => r.members.map(k => { const p = S.people.get(k) || {score: 0, plus: 0, minus: 0}; return {k, s: p.score, p}; })).filter(x => pred(x.s, x.p)).map(x => who(x.k) + " " + nameOf(x.k) + "（" + fmt(x.s) + "）").join("、") || "無";
+      const [from, to] = D.monthRange(month), S = D.summarize(reportsList(), makeResolver(), from, to);
+      const names = (rs, pred) => rs.flatMap(r => r.members.map(k => { const p = (r.memberScores ? r.memberScores.get(k) : S.people.get(k)) || {score: 0, plus: 0, minus: 0}; return {k, s: p.score, p}; })).filter(x => pred(x.s, x.p)).map(x => who(x.k) + " " + nameOf(x.k) + "（" + fmt(x.s) + "）").join("、") || "無";
       const summary = [];
       if (S.worst.length) summary.push("最劣寢：" + S.worst.map(r => RL(r.room)).join("、") + "（" + fmt(S.worst[0].total) + "）", "　負分同學：" + names(S.worst, v => v < 0));
       if (S.best.length) summary.push("最優寢：" + S.best.map(r => RL(r.room)).join("、") + "（" + fmt(S.best[0].total) + "）", "　無負分同學：" + names(S.best, (v, p) => !p.minus));
@@ -529,7 +734,7 @@
         rows: roomRows(E).map(r => [RL(r.room), r.pp, r.pm, r.gp, r.gm, num(r.ps), num(r.gs), num(r.t)]), file: "寢室總覽_" + q.from + "_" + q.to};
       return {title: "個人總覽", subtitle: sub, summary: [], sheet: "個人總覽", numFrom: 4,
         columns: ["女生隊號", "建制隊號", "姓名", "寢室", "優", "缺", "分數"],
-        rows: personRows(E).map(r => { const s = stu(r.k) || {}; return [s.female || "", s.team || "", r.name, r.room ? RL(r.room) : "", r.plus, r.minus, num(r.s)]; }),
+        rows: personRows(E).map(r => { const s = stu(r.k) || {}, o = otherOf(r.k); return [o ? "" : s.female || "", s.team || "", r.name, r.room ? RL(r.room) : r.away, r.plus, r.minus, num(r.s)]; }),
         file: "個人總覽_" + q.from + "_" + q.to};
     }
     // 檢查紀錄：跟畫面一樣，一次檢查一列（新的在上），附原始公告
@@ -793,15 +998,28 @@
       const so = t.closest("[data-psort]"); if (so) { const k = so.dataset.psort; q.sort = q.sort.k === k ? {k, dir: -q.sort.dir} : {k, dir: ["s", "plus", "minus"].includes(k) ? -1 : 1}; renderQuery(); return; }
       const gr = t.closest("[data-goroom]"); if (gr) { e.preventDefault(); q.room = gr.dataset.goroom; q.person = ""; $("qPerson").value = ""; renderQuery(); window.scrollTo({top: 0}); return; }
       const gp = t.closest("[data-goperson]"); if (gp) { e.preventDefault(); const k = gp.dataset.goperson; q.person = who(k); $("qPerson").value = who(k) + " " + nameOf(k); renderQuery(); window.scrollTo({top: 0}); return; }
+      const rv = t.closest("[data-roomsver]");
+      if (rv) { if (roomsEditing) return; roomsView = rv.dataset.roomsver; renderRooms(); return; }
       if (t.id === "dRoomsSave") {
-        const text = $("dRoomsText").value, cd = cdata();
-        cd.roomsText = text; cd.rooms = D.parseRooms(text, index().norm).rooms;
-        try { await flush(); roomsEditing = false; roomsInfo(); renderRoomsLock(); }
+        const text = $("dRoomsText").value, cd = cdata(), from = ($("dRoomsFrom") && $("dRoomsFrom").value) || "";
+        const exists = versionsOf(cd).some(v => v.from === from);
+        if (exists && from !== roomsEditFrom && !confirm(`已經有一份「${fromLabel(from)}」的名單，要用這份取代嗎？`)) return;
+        if (roomsEditing === "edit" && roomsEditFrom !== null && roomsEditFrom !== from) deleteRoomsVersion(cd, roomsEditFrom);
+        setRoomsVersion(cd, from, text, D.parseRooms(text, index().norm, curBuilding()).rooms);
+        try { await flush(); roomsEditing = false; roomsEditFrom = null; roomsView = from; renderRooms(); }
         catch (err) { alert("儲存失敗：" + err.message); }
         return;
       }
-      if (t.id === "dRoomsEdit") { roomsEditing = true; renderRoomsLock(); $("dRoomsText").focus(); return; }
-      if (t.id === "dRoomsCancel") { roomsEditing = false; $("dRoomsText").value = cdata().roomsText; roomsInfo(); renderRoomsLock(); return; }
+      if (t.id === "dRoomsEdit") { const v = shownVersion(); roomsEditing = "edit"; roomsEditFrom = v ? v.from : ""; renderRoomsLock(); roomsInfo(); $("dRoomsText").focus(); return; }
+      if (t.id === "dRoomsNew") { roomsEditing = "new"; roomsEditFrom = null; renderRoomsLock(); roomsInfo(); $("dRoomsText").focus(); return; }
+      if (t.id === "dRoomsCancel") { roomsEditing = false; roomsEditFrom = null; const v = shownVersion(); $("dRoomsText").value = v ? v.text : (cdata().roomsText || ""); renderRooms(); return; }
+      if (t.id === "dRoomsDelVer") {
+        const v = shownVersion(); if (!v) return;
+        if (!confirm(`確定刪除「${fromLabel(v.from)}」的寢室名單？那段期間的檢查會改用前一份名單計算。`)) return;
+        deleteRoomsVersion(cdata(), v.from); roomsView = null;
+        try { await flush(); } catch (err) { alert("儲存失敗：" + err.message); }
+        renderRooms(); return;
+      }
       const del = t.closest("[data-del]");
       if (del) {
         const id = del.dataset.del, r = cdata().reports[id], src = srcOf(id), n = B.countPoints(src);
@@ -814,8 +1032,11 @@
       }
     });
     root.addEventListener("change", e => {
+      if (e.target.id === "dOcrFile") { const f = e.target.files[0]; e.target.value = ""; runOcr(f); return; }
+      if (e.target.id === "dRoomsFrom") { roomsInfo(); return; }
+      if (e.target.id === "dBuilding") { changeBuilding(e.target); return; }
       const t = e.target;
-      if (t.id === "dDate" && draft && t.value) { draft.date = t.value; draft.dateEdited = true; pendingOverwrite = false; renderDraft(); }
+      if (t.id === "dDate" && draft && t.value) { draft.date = t.value; draft.dateEdited = true; pendingOverwrite = false; buildDraft(); }
       if (t.id === "dMonth") { month = t.value; renderStats(); }
       if (t.id === "qFrom" && t.value) { q.from = t.value; if (q.to < q.from) q.to = q.from; renderQuery(); }
       if (t.id === "qTo" && t.value) { q.to = t.value; if (q.from > q.to) q.from = q.to; renderQuery(); }
@@ -833,7 +1054,7 @@
     let rawTimer, personTimer;
     root.addEventListener("input", e => {
       const t = e.target;
-      if (t.id === "dRaw") { clearTimeout(rawTimer); rawTimer = setTimeout(buildDraft, 250); msg("dEntryMsg", "", ""); }
+      if (t.id === "dRaw") { if (!t.value.trim() && !ocrBusy) ocrReset(); clearTimeout(rawTimer); rawTimer = setTimeout(buildDraft, 250); msg("dEntryMsg", "", ""); }
       if (t.id === "dRoomsText") roomsInfo();
       if (t.id === "qPerson") { clearTimeout(personTimer); personTimer = setTimeout(() => { q.person = t.value.trim(); renderQuery(); }, 250); }
     });
@@ -849,7 +1070,7 @@
       draft = null; month = null; q.from = null; q.room = ""; q.person = "";
       showSub(sub);
     },
-    cohortChanged() { if (!data) return; idxCache = {id: null}; roomsEditing = false; draft = null; month = null; q.room = ""; q.person = ""; if ($("dRaw")) $("dRaw").value = ""; render(); },
+    cohortChanged() { if (!data) return; idxCache = {id: null}; roomsEditing = false; roomsView = null; roomsEditFrom = null; draft = null; month = null; q.room = ""; q.person = ""; if ($("dRaw")) $("dRaw").value = ""; render(); },
     templateChanged() { if (data && sub === "rooms") render(); },
     lock() { data = null; draft = null; if ($("tab-dorm")) $("tab-dorm").innerHTML = ""; },
     flush() { return data ? flush() : Promise.resolve(); },
