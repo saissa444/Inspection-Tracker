@@ -146,7 +146,9 @@
         <p id="dOcrMsg" class="note d-ocrmsg" role="status" aria-live="polite"></p>
         <details id="dOcrPreview" class="d-ocrprev" open hidden><summary>對照圖片（核對用，不會存起來）</summary><img id="dOcrImg" alt="公告圖片"></details>
         <div class="input-cohort">對象：<span class="cohort-tag active-cohort-tag"></span>（用這一期的名冊辨識女生隊號、建制隊號；建制隊號也會對照其他期別）</div>
-        <textarea id="dRaw" style="min-height:180px" placeholder="把 LINE 上的內務檢查公告整則貼上，例如：&#10;1151019內務檢查&#10;被優：002 003&#10;棉被不潔 088 444194&#10;公物&#10;窗溝不潔 育五7、6-2"></textarea>
+        <div class="d-hlwrap"><div id="dRawHl" class="d-hl" aria-hidden="true"></div>
+          <textarea id="dRaw" style="min-height:180px" placeholder="把 LINE 上的內務檢查公告整則貼上，例如：&#10;1151019內務檢查&#10;被優：002 003&#10;棉被不潔 088 444194&#10;公物&#10;窗溝不潔 育五7、6-2"></textarea>
+        </div>
         <div id="dQuickSlot"></div>
         <p class="note">「公物」那一行以下算公區（寫寢室號），以上算個人（寫女生隊號或建制隊號）。項目後面有標「(+0.2)」「(-0.2)」就照標示；標「(寢室記大X)」算那間寢室的公區缺點。沒有標示時，項目名稱有「優、整潔、整齊、乾淨」算加分，其他算扣分。點分數標籤可以改。</p>
         <details class="d-imghelp"><summary>公告是圖片？</summary>
@@ -270,7 +272,7 @@
 
   function renderDraft() {
     const box = $("dPreview");
-    if (!draft) { box.hidden = true; return; }
+    if (!draft) { box.hidden = true; hlMarks = {nums: [], lines: []}; renderHl(); return; }
     box.hidden = false;
     $("dDate").value = draft.date;
     $("dInspList").innerHTML = data.inspectors.map(n => `<option value="${esc(n)}"></option>`).join("");
@@ -299,10 +301,13 @@
     const warns = [], info = [];
     const notStu = Array.from(new Set(pItems.flatMap(i => i.targets).filter(t => t[0] === "?")));
     const twin = notStu.filter(t => /（兩期同號）$/.test(t)), lost = notStu.filter(t => !/（兩期同號）$/.test(t));
-    if (twin.length) warns.push(`這些女生隊號，兩期都有同學住在這棟樓，分不出是誰，請改寫 6 碼建制隊號：${twin.map(t => t.slice(1).replace("（兩期同號）", "")).join("、")}`);
-    if (lost.length) warns.push(`名冊裡找不到這些號碼：${lost.map(t => t.slice(1)).join("、")}`);
+    const twinRaw = twin.map(t => t.slice(1).replace("（兩期同號）", "")), lostRaw = lost.map(t => t.slice(1));
     const badNums = Array.from(new Set(pItems.concat(gItems).flatMap(i => i.bad).filter(b => /^\d+$/.test(b))));
-    if (badNums.length) warns.push(`號碼位數不對（可能打錯或辨識錯）：${badNums.join("、")}`);
+    // 有問題的號碼：在上面的公告框裡反紅標示；點下面的號碼可以跳到那個位置
+    const jumps = list => list.map(n => `<button type="button" class="d-jump" data-jump="${esc(n)}" title="在公告框裡找出這個號碼">${esc(n)}</button>`).join("、");
+    if (twin.length) warns.push({html: `這些女生隊號，兩期都有同學住在這棟樓，分不出是誰，請改寫 6 碼建制隊號：${jumps(twinRaw)}`});
+    if (lost.length) warns.push({html: `名冊裡找不到這些號碼：${jumps(lostRaw)}`});
+    if (badNums.length) warns.push({html: `號碼位數不對（可能打錯或辨識錯）：${jumps(badNums)}`});
     const guests = Array.from(new Set(pItems.flatMap(i => i.targets).filter(t => t[0] !== "?" && otherOf(t))));
     if (guests.length) {
       const byC = {}; guests.forEach(t => { (byC[otherOf(t)] = byC[otherOf(t)] || []).push(t); });
@@ -319,8 +324,12 @@
     }
     if (!draft.dateFound && !draft.dateEdited) warns.push("公告裡沒有讀到日期，先填今天，請確認檢查日期。");
     if (draft.floor && draft.floor.length) warns.push(`樓層公共區域（不屬於任何寢室，不計分）：${draft.floor.join("／")}`);
-    if (draft.ignored.length) warns.push(`略過的文字：${draft.ignored.join("／")}`);
-    $("dWarn").innerHTML = info.map(w => `<div class="status">${esc(w)}</div>`).join("") + warns.map(w => `<div class="status warning">${esc(w)}</div>`).join("");
+    if (draft.ignored.length) warns.push(`略過的文字（公告框裡標黃色）：${draft.ignored.join("／")}`);
+    const marked = twinRaw.length + lostRaw.length + badNums.length;
+    if (marked) info.unshift(`有 ${marked} 個號碼需要確認，已在公告框裡反紅標示；點下面的號碼可以直接跳過去。`);
+    $("dWarn").innerHTML = info.map(w => `<div class="status">${esc(w)}</div>`).join("") + warns.map(w => `<div class="status warning">${typeof w === "string" ? esc(w) : w.html}</div>`).join("");
+    hlMarks = {nums: Array.from(new Set(twinRaw.concat(lostRaw, badNums))), lines: draft.ignored.slice()};
+    renderHl();
 
     const pv = pointsPreview(), plus = pv.records.filter(r => r.kind === "加分").length, minus = pv.records.length - plus;
     const needMap = pItems.length && (!data.mapping || !data.mapping.plus && pItems.some(i => i.sign > 0) || !data.mapping.minus && pItems.some(i => i.sign < 0));
@@ -654,6 +663,77 @@
     return {warn: miss.size > 0, message: `已把內務資料匯入「${cohort().label}」：${added + replaced} 次檢查（新增 ${added}、取代 ${replaced}）` + (d.rooms && d.rooms.length ? `和 ${d.rooms.length} 間寢室名單` : "") + "。這些舊紀錄不會轉入加扣分。" + (miss.size ? `名冊找不到的號碼已略過：${Array.from(miss).slice(0, 20).join("、")}` : "")};
   }
 
+  /* ═════ 公告框裡標出有問題的號碼 ═════
+     輸入框本身不能把部分文字變色，所以在它下面墊一層字型、邊距、換行都一樣的標示層，
+     標示層的字是透明的，只顯示反紅／標黃的底色；輸入框改成透明底，看起來就像直接標在框裡。 */
+  let hlMarks = {nums: [], lines: []};
+  const HL_COPY = ["boxSizing", "fontFamily", "fontSize", "fontWeight", "fontStyle", "fontVariant", "lineHeight", "letterSpacing", "wordSpacing",
+    "textIndent", "textTransform", "tabSize", "paddingTop", "paddingRight", "paddingBottom", "paddingLeft",
+    "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth", "borderRadius"];
+  const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const reEsc = t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // 跟公告解析時一樣整理一行（全形數字、看不見的字元、全形空白），用來比對「略過的文字」
+  const normLine = l => l.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/[\u200b-\u200d\u2060\ufeff]/g, "").replace(/\u3000/g, " ").trim();
+  function syncHlBox() {
+    const ta = $("dRaw"), hl = $("dRawHl"); if (!ta || !hl) return;
+    const cs = getComputedStyle(ta);
+    HL_COPY.forEach(k => { hl.style[k] = cs[k]; });
+    hl.style.borderStyle = "solid"; hl.style.borderColor = "transparent";
+    // 捲軸會讓輸入框裡的字變窄；iPhone 的輸入框文字左右各多縮 3px
+    const sb = Math.max(0, ta.offsetWidth - ta.clientWidth - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth));
+    const ios = IOS ? 3 : 0;
+    hl.style.paddingLeft = (parseFloat(cs.paddingLeft) + ios) + "px";
+    hl.style.paddingRight = (parseFloat(cs.paddingRight) + ios + sb) + "px";
+    hl.style.width = ta.offsetWidth + "px"; hl.style.height = ta.offsetHeight + "px";
+    hl.scrollTop = ta.scrollTop;
+  }
+  function hlRanges(text) {
+    const ranges = [];
+    if (hlMarks.nums.length) {
+      const re = new RegExp("(^|[^\\d])(" + hlMarks.nums.slice().sort((a, b) => b.length - a.length).map(reEsc).join("|") + ")(?!\\d)", "g");
+      let m;
+      while ((m = re.exec(text))) { const st = m.index + m[1].length; ranges.push([st, st + m[2].length, "bad"]); re.lastIndex = st + m[2].length; }
+    }
+    if (hlMarks.lines.length) {
+      const want = new Set(hlMarks.lines.map(normLine)); let pos = 0;
+      for (const l of text.split("\n")) {
+        const t = l.trim();
+        if (t && want.has(normLine(l))) { const st = pos + l.indexOf(t); ranges.push([st, st + t.length, "skip"]); }
+        pos += l.length + 1;
+      }
+    }
+    ranges.sort((a, b) => a[0] - b[0] || (a[2] === "bad" ? -1 : 1));
+    const out = []; let end = -1;
+    for (const r of ranges) if (r[0] >= end) { out.push(r); end = r[1]; }   // 重疊時以反紅的號碼為準
+    return out;
+  }
+  let hlObserved = null;
+  function renderHl() {
+    const ta = $("dRaw"), hl = $("dRawHl"); if (!ta || !hl) return;
+    if (window.ResizeObserver && hlObserved !== ta) { hlObserved = ta; new ResizeObserver(syncHlBox).observe(ta); }
+    const text = ta.value, rs = hlRanges(text);
+    let h = "", at = 0;
+    for (const [a, b, kind] of rs) { h += esc(text.slice(at, a)) + `<mark class="hl-${kind}" data-start="${a}">${esc(text.slice(a, b))}</mark>`; at = b; }
+    h += esc(text.slice(at)) + "\n";   // 最後多一行，最後一行是空行時高度才會對齊
+    hl.innerHTML = h;
+    hl.classList.toggle("on", rs.length > 0);
+    syncHlBox();
+  }
+  // 點警告裡的號碼：捲到公告框裡那個號碼並閃一下；電腦上同時把它選起來，直接打字就能改
+  function jumpTo(n) {
+    const ta = $("dRaw"), hl = $("dRawHl");
+    const m = new RegExp("(^|[^\\d])" + reEsc(n) + "(?!\\d)").exec(ta.value); if (!m) return;
+    const st = m.index + m[1].length;
+    const mk = hl.querySelector(`mark[data-start="${st}"]`);
+    if (mk) {
+      ta.scrollTop = Math.max(0, mk.offsetTop - ta.clientHeight / 3); hl.scrollTop = ta.scrollTop;
+      mk.classList.remove("flash"); void mk.offsetWidth; mk.classList.add("flash");
+    }
+    ta.scrollIntoView({block: "center", behavior: "smooth"});
+    const touch = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (!touch) { ta.focus({preventScroll: true}); ta.setSelectionRange(st, st + n.length); }
+  }
+
   /* ═════ 從圖片辨識（js/ocr.js） ═════ */
   let ocrBusy = false, ocrUrl = null;
   function ocrReset() {
@@ -967,9 +1047,13 @@
   /* ═════ 事件 ═════ */
   function bind() {
     const root = $("tab-dorm");
+    // 公告框捲動、改變大小時，標示層跟著對齊（捲動事件不會往上傳，用 capture 接）
+    root.addEventListener("scroll", e => { if (e.target.id === "dRaw") $("dRawHl").scrollTop = e.target.scrollTop; }, true);
+    window.addEventListener("resize", syncHlBox);
     root.addEventListener("click", async e => {
       const t = e.target;
       const sb = t.closest("[data-sub]"); if (sb) { showSub(sb.dataset.sub); return; }
+      const jp = t.closest("[data-jump]"); if (jp) { jumpTo(jp.dataset.jump); return; }
       const pi = t.closest("[data-pickinsp]"); if (pi) { $("dInsp").value = pi.dataset.pickinsp; renderDraft(); return; }
       const f = t.closest("[data-flip]"); if (f && draft) { const it = draft.items[+f.dataset.flip]; it.sign *= -1; renderDraft(); return; }
       if (t.id === "dRawCopy") { copyRaw(t); return; }
@@ -1054,7 +1138,7 @@
     let rawTimer, personTimer;
     root.addEventListener("input", e => {
       const t = e.target;
-      if (t.id === "dRaw") { if (!t.value.trim() && !ocrBusy) ocrReset(); clearTimeout(rawTimer); rawTimer = setTimeout(buildDraft, 250); msg("dEntryMsg", "", ""); }
+      if (t.id === "dRaw") { renderHl(); if (!t.value.trim() && !ocrBusy) ocrReset(); clearTimeout(rawTimer); rawTimer = setTimeout(buildDraft, 250); msg("dEntryMsg", "", ""); }
       if (t.id === "dRoomsText") roomsInfo();
       if (t.id === "qPerson") { clearTimeout(personTimer); personTimer = setTimeout(() => { q.person = t.value.trim(); renderQuery(); }, 250); }
     });

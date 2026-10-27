@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>學生加扣分・獎懲登錄</title>
-<link rel="manifest" href="./manifest.webmanifest?v=20261023i">
+<link rel="manifest" href="./manifest.webmanifest?v=20261028a">
 <meta name="theme-color" content="#526a85">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="加扣分獎懲">
-<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261023i">
+<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261028a">
 <style>
 :root{--ink:#3b3a37;--muted:#6e6862;--line:#e4ded5;--bg:#f1eee9;--card:#fff;--brand:#526a85;--brand-2:#5d7893;--soft:#edf0f3;--err:#9c5454;--ok:#557357;--warn:#8a6538;--cohort:#526a85;font-family:system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;color:var(--ink);background:var(--bg)}
 *{box-sizing:border-box}
@@ -357,6 +357,16 @@ button.d-small{min-height:36px;padding:6px 12px;font-size:14px;margin:4px 0}
 /* 「圖片」鍵：跟複製／貼上／清空同樣大小，但電腦上也要顯示 */
 .copy-btn.d-ocrbtn{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;background:#e9ecef;color:var(--brand);box-shadow:none}
 .d-ocrmsg{margin:0 0 6px}
+/* 公告框的反紅標示：標示層墊在透明的輸入框下面 */
+.d-hlwrap{position:relative}
+.d-hlwrap>textarea{position:relative;z-index:1;background:transparent}
+.d-hl{position:absolute;top:0;left:0;z-index:0;overflow:hidden;white-space:pre-wrap;overflow-wrap:break-word;word-wrap:break-word;color:transparent;background:#fff;pointer-events:none;margin:0}
+.d-hl mark{color:transparent;border-radius:3px;padding:0}
+.d-hl mark.hl-bad{background:rgba(214,48,49,.30);box-shadow:0 0 0 3px rgba(214,48,49,.30)}
+.d-hl mark.hl-skip{background:rgba(234,179,8,.30);box-shadow:0 0 0 2px rgba(234,179,8,.30)}
+.d-hl mark.flash{animation:hlflash 1.4s ease}
+@keyframes hlflash{0%,40%{background:rgba(214,48,49,.75)}100%{background:rgba(214,48,49,.30)}}
+.d-jump{display:inline;min-height:0;margin:0 1px;padding:1px 6px;border:0;border-radius:6px;background:rgba(214,48,49,.16);color:#a32020;font:inherit;font-weight:700;text-decoration:underline;cursor:pointer;box-shadow:none}
 .d-ocrmsg:empty{display:none}
 .d-ocrbtn.busy{opacity:.6;pointer-events:none}
 .d-ocrprev{margin:6px 0 8px}
@@ -779,12 +789,12 @@ dialog::backdrop{background:rgba(60,52,44,.4);backdrop-filter:blur(3px);-webkit-
 })();
 </script>
 <script defer src="./vendor/xlsx.full.min.js?v=0.20.3"></script>
-<script defer src="./js/core.js?v=20261023i"></script>
-<script defer src="./js/store.js?v=20261023i"></script>
-<script defer src="./js/dorm-core.js?v=20261023i"></script>
-<script defer src="./js/ocr.js?v=20261023i"></script>
-<script defer src="./js/dorm.js?v=20261023i"></script>
-<script defer src="./js/app.js?v=20261023i"></script>
+<script defer src="./js/core.js?v=20261028a"></script>
+<script defer src="./js/store.js?v=20261028a"></script>
+<script defer src="./js/dorm-core.js?v=20261028a"></script>
+<script defer src="./js/ocr.js?v=20261028a"></script>
+<script defer src="./js/dorm.js?v=20261028a"></script>
+<script defer src="./js/app.js?v=20261028a"></script>
 <script>if ("serviceWorker" in navigator && location.protocol === "https:") window.addEventListener("load", function () { navigator.serviceWorker.register("./sw.js").catch(function () {}); });</script>
 </body>
 </html>

@@ -156,7 +156,13 @@
       let leadBad = [];
       if (i > 0 && toks.slice(0, i).every(t => { const [n, note] = split(t); return !note && numish(n); })) { leadBad = toks.slice(0, i).map(t => split(t)[0]); toks.splice(0, i); i = 0; }
       let item;
-      if (i > 0) { dropPending(); item = toks.slice(0, i).join(" "); }
+      if (i > 0) {
+        dropPending();
+        // 項目名稱後面、第一個正確號碼前面的錯號碼（枕頭不潔 47041 441157）：不是名稱的一部分，標成看不懂
+        const j = toks.slice(0, i).findIndex((t, x) => x > 0 && numish(split(t)[0]) && split(t)[0].length >= 4);
+        if (j > 0) { leadBad = toks.slice(j, i).map(t => split(t)[0]); item = toks.slice(0, j).join(" "); }
+        else item = toks.slice(0, i).join(" ");
+      }
       else if (i === 0 && pending && pending.mode === lm) { item = pending.text; pending.used = true; if (pending.sign !== null) mkSign = pending.sign; }
       // 上一行的號碼太長換行：整行只有號碼（沒有括號說明），接到上一個項目
       // （打錯的號碼，例如多一碼，也留在這個項目裡標成「看不懂」）
@@ -179,9 +185,17 @@
       }
       // 「育五廁所」「育六曬衣場」這類樓層公共區域，不屬於任何寢室，不計分
       else if (i < 0 && new RegExp("^[" + BUILDINGS + "][一二三四五六七八九十\\d](?![一二三四五六七八九十\\d\\-－])").test(line)) { dropPending(); cont = null; floor.push(line); continue; }
+      // 「枕頭不潔 47041」：有項目名稱，但號碼全都對不上（位數不對）→ 保留項目，把號碼標成看不懂，不要整行略過
+      else if (i < 0 && lm === "p" && toks.length > 1 && !numish(split(toks[0])[0]) && toks.slice(1).some(t => { const n = split(t)[0]; return numish(n) && n.length >= 4; }) && toks.slice(toks.findIndex(t => numish(split(t)[0]))).every(t => numish(split(t)[0]))) {
+        dropPending();
+        const k = toks.findIndex(t => numish(split(t)[0]));
+        items.push({scope: lm, item: toks.slice(0, k).map(t => split(t)[0]).join(" "), sign: signFor(toks.slice(0, k).join(" ")), targets: [], bad: toks.slice(k).map(t => split(t)[0]), notes: {}});
+        cont = items[items.length - 1];
+        continue;
+      }
       else if (i < 0 && /[一-鿿]/.test(line) && line.length <= 20) { dropPending(); cont = null; pending = {text: toks.map(t => split(t)[0]).join(" "), mode: lm, sign: mkSign}; continue; }
       else { cont = null; ignored.push(line); continue; }
-      const targets = [], bad = [], tnotes = {};
+      const targets = [], bad = i > 0 ? leadBad.slice() : [], tnotes = {};
       for (const t of toks.slice(Math.max(i, 0))) {
         const [n, note] = split(t), k = isT(n);
         if (k) { targets.push(k); if (note) tnotes[k] = note; } else bad.push(n);
