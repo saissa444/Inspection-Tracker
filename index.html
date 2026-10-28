@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>學生加扣分・獎懲登錄</title>
-<link rel="manifest" href="./manifest.webmanifest?v=20261028a">
+<link rel="manifest" href="./manifest.webmanifest?v=20261028b">
 <meta name="theme-color" content="#526a85">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="加扣分獎懲">
-<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261028a">
+<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261028b">
 <style>
 :root{--ink:#3b3a37;--muted:#6e6862;--line:#e4ded5;--bg:#f1eee9;--card:#fff;--brand:#526a85;--brand-2:#5d7893;--soft:#edf0f3;--err:#9c5454;--ok:#557357;--warn:#8a6538;--cohort:#526a85;font-family:system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;color:var(--ink);background:var(--bg)}
 *{box-sizing:border-box}
@@ -151,6 +151,13 @@ td button{margin:2px 4px 2px 0;min-height:38px;padding:6px 12px}
   .tablewrap td.cell-actions{order:99;display:flex;gap:8px;margin-top:6px;padding-top:8px;border-top:1px solid var(--line)}
   .tablewrap td.cell-actions button{flex:1;margin:0;min-height:42px}
   .tablewrap tr#pInlineEditRow{padding:0;border:0;box-shadow:none;background:transparent}
+  /* 加扣分預覽卡片往左滑出現「刪除」 */
+  #pRecords tr[data-index]{position:relative;overflow:hidden;touch-action:pan-y}
+  #pRecords tr[data-index]>td:not(.cell-swipe){transform:translateX(var(--sx,0px))}
+  #pRecords tr.swipe-anim>td:not(.cell-swipe){transition:transform .2s ease}
+  #pRecords tr.swipe-anim>td.cell-swipe{transition:width .2s ease}
+  #pRecords td.cell-swipe{position:absolute;top:0;right:0;bottom:0;width:calc(-1 * var(--sx,0px));max-width:none;padding:0;display:flex;overflow:hidden;z-index:3;flex:none}
+  .swipe-del{flex:1;margin:0;border-radius:0;background:var(--err);color:#fff;font-weight:700;font-size:15px;min-height:0;padding:0 6px;white-space:pre-line;line-height:1.35;box-shadow:none}
   .check-label{min-height:36px}
 }
 
@@ -177,7 +184,7 @@ td.cell-summary{display:none}
   .view-seg{display:inline-flex}
   .tablewrap.compact td.cell-summary{display:block;flex:1 1 0;min-width:0;cursor:pointer;padding:2px 0}
   .tablewrap.compact td.cell-cohort{display:none}
-  .tablewrap.compact tr:not(.expanded):not(#pInlineEditRow)>td:not(.cell-select):not(.cell-summary){display:none}
+  .tablewrap.compact tr:not(.expanded):not(#pInlineEditRow)>td:not(.cell-select):not(.cell-summary):not(.cell-swipe){display:none}
   .tablewrap.compact tr{margin:6px 0;padding:7px 10px}
   .tablewrap.compact tr.expanded td.cell-summary{padding-bottom:8px;margin-bottom:4px;border-bottom:1px dashed var(--line)}
   .tablewrap.compact td.cell-select{padding-right:8px}
@@ -193,6 +200,8 @@ td.cell-summary{display:none}
   .sum-label{color:#8d877f;font-size:12px}
 }
 /* 電腦／平板：「勾選」「操作」固定在最左側，編輯與刪除左右並排 */
+td.cell-swipe{display:none}
+@media (max-width:1023px){ #pRecords td.cell-swipe{display:flex} }
 @media (min-width:1024px){
   /* 欄距與按鈕縮小、標題可換行，讓整張表在畫面內顯示，不必左右滑動 */
   .tablewrap.records table{font-size:13.5px}
@@ -789,12 +798,12 @@ dialog::backdrop{background:rgba(60,52,44,.4);backdrop-filter:blur(3px);-webkit-
 })();
 </script>
 <script defer src="./vendor/xlsx.full.min.js?v=0.20.3"></script>
-<script defer src="./js/core.js?v=20261028a"></script>
-<script defer src="./js/store.js?v=20261028a"></script>
-<script defer src="./js/dorm-core.js?v=20261028a"></script>
-<script defer src="./js/ocr.js?v=20261028a"></script>
-<script defer src="./js/dorm.js?v=20261028a"></script>
-<script defer src="./js/app.js?v=20261028a"></script>
+<script defer src="./js/core.js?v=20261028b"></script>
+<script defer src="./js/store.js?v=20261028b"></script>
+<script defer src="./js/dorm-core.js?v=20261028b"></script>
+<script defer src="./js/ocr.js?v=20261028b"></script>
+<script defer src="./js/dorm.js?v=20261028b"></script>
+<script defer src="./js/app.js?v=20261028b"></script>
 <script>if ("serviceWorker" in navigator && location.protocol === "https:") window.addEventListener("load", function () { navigator.serviceWorker.register("./sw.js").catch(function () {}); });</script>
 </body>
 </html>

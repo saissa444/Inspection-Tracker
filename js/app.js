@@ -500,7 +500,9 @@
     const hint = document.querySelector("#tab-" + (prefix === "p" ? "points" : "reward") + " .bulk-hint");
     if (!hint) return;
     hint.classList.toggle("active", n > 1);
-    hint.textContent = n > 1 ? "按任一勾選列的「編輯」或「刪除」，會一次處理這 " + n + " 筆" : "小技巧：電腦按住 Shift 可連續勾選；手機按住勾選框上下滑動可連續勾選";
+    const swipeTip = prefix === "p" && window.matchMedia("(max-width: 1023px)").matches;
+    hint.textContent = n > 1 ? "按任一勾選列的「編輯」或「刪除」" + (swipeTip ? "，或把勾選的卡片往左滑" : "") + "，會一次處理這 " + n + " 筆"
+      : "小技巧：電腦按住 Shift 可連續勾選；手機按住勾選框上下滑動可連續勾選" + (swipeTip ? "；卡片往左滑可以刪除" : "");
   }
   function updateSelBar() {
     const tab = settings.tab, n = tab === "points" ? pSelected.size : tab === "reward" ? rSelectedRows.size : 0;
@@ -1418,6 +1420,77 @@
   $("pSelectAll").addEventListener("change", pSelectAll);
   $("pSelectAllBottom").addEventListener("change", pSelectAll);
 
+  /* ───────── 手機卡片：往左滑出現「刪除」 ─────────
+     滑的那一筆有勾選、而且一共勾了好幾筆時，按「刪除」會一次刪除全部勾選的紀錄（會先確認）；
+     沒勾選的那一筆就只刪它自己。上下捲動不受影響（卡片只接手左右方向的滑動）。 */
+  const SWIPE_W = 92;
+  let swipe = null, swipeOpen = null, swipeClickBlock = 0;
+  const cardMode = () => window.matchMedia("(max-width: 1023px)").matches;
+  function swipeAction(tr) {
+    let td = tr.querySelector("td.cell-swipe");
+    if (!td) {
+      td = document.createElement("td"); td.className = "cell-swipe";
+      const b = document.createElement("button"); b.type = "button"; b.className = "swipe-del";
+      b.addEventListener("click", event => { event.stopPropagation(); swipeDelete(tr); });
+      td.append(b); tr.append(td);
+    }
+    const r = pRecords[Number(tr.dataset.index)], multi = r && pSelected.has(r) && pSelected.size > 1;
+    td.firstChild.textContent = multi ? "刪除\n已選 " + pSelected.size + " 筆" : "刪除";
+    td.firstChild.setAttribute("aria-label", multi ? "刪除勾選的 " + pSelected.size + " 筆紀錄" : "刪除這筆紀錄：" + (r ? r.name : ""));
+    return td;
+  }
+  function setSwipe(tr, x, animate) {
+    tr.classList.toggle("swipe-anim", !!animate);
+    tr.style.setProperty("--sx", x + "px");
+  }
+  function closeSwipe(animate = true) { if (swipeOpen) { const tr = swipeOpen; swipeOpen = null; setSwipe(tr, 0, animate); } }
+  function swipeDelete(tr) {
+    const r = pRecords[Number(tr.dataset.index)];
+    if (!r) return;
+    if (pSelected.has(r) && pSelected.size > 1) { closeSwipe(); pDeleteSelected(); return; }
+    pRecords.splice(pRecords.indexOf(r), 1); pSelected.delete(r); pRenderRecords(); saveDrafts();
+    $("pCount").textContent += "（已刪除：" + ((r.female || r.team || "") + " " + r.name).trim() + "）";
+  }
+  $("pRecords").addEventListener("pointerdown", event => {
+    if (event.pointerType === "mouse" || !cardMode()) return;
+    const tr = event.target.closest("tr[data-index]");
+    if (!tr || tr.classList.contains("inline-editing") || event.target.closest("td.cell-select, input, select, textarea, .swipe-del")) return;
+    if (swipeOpen && swipeOpen !== tr) closeSwipe();
+    swipe = {tr, id: event.pointerId, x0: event.clientX, y0: event.clientY, base: swipeOpen === tr ? -SWIPE_W : 0, dir: null};
+  });
+  document.addEventListener("pointermove", event => {
+    if (!swipe || event.pointerId !== swipe.id) return;
+    const dx = event.clientX - swipe.x0, dy = event.clientY - swipe.y0;
+    if (!swipe.dir) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      swipe.dir = Math.abs(dx) > Math.abs(dy) * 1.2 ? "h" : "v";
+      if (swipe.dir === "h") swipeAction(swipe.tr);
+    }
+    if (swipe.dir !== "h") return;
+    event.preventDefault();
+    setSwipe(swipe.tr, Math.max(-SWIPE_W * 1.35, Math.min(0, swipe.base + dx)), false);
+  }, {passive: false});
+  const endSwipe = event => {
+    if (!swipe || (event && event.pointerId !== swipe.id)) return;
+    const s = swipe; swipe = null;
+    if (s.dir !== "h") return;
+    swipeClickBlock = Date.now();
+    const x = parseFloat(s.tr.style.getPropertyValue("--sx")) || 0;
+    if (x < -SWIPE_W * 0.45) { setSwipe(s.tr, -SWIPE_W, true); swipeOpen = s.tr; }
+    else { setSwipe(s.tr, 0, true); if (swipeOpen === s.tr) swipeOpen = null; }
+  };
+  document.addEventListener("pointerup", endSwipe);
+  document.addEventListener("pointercancel", endSwipe);
+  // 滑完放開時的那一下點擊，不要展開卡片；滑開後點畫面其他地方就收回
+  document.addEventListener("click", event => {
+    if (Date.now() - swipeClickBlock < 350 && event.target.closest("#pRecords") && !event.target.closest(".swipe-del")) { event.stopPropagation(); event.preventDefault(); return; }
+    if (swipeOpen && !event.target.closest(".swipe-del")) {
+      const inside = event.target.closest("tr") === swipeOpen;
+      closeSwipe();
+      if (inside) { event.stopPropagation(); event.preventDefault(); }
+    }
+  }, true);
+
   function pDeleteSelected() {
     const targets = new Set(pRecords.filter(r => pSelected.has(r)));
     if (!targets.size) return;
@@ -1698,6 +1771,7 @@
 
   function pRenderRecords() {
     pInline = null; // 重新繪製時放棄未儲存的列內編輯
+    swipeOpen = null;
     $("pCount").textContent = pRecords.length ? "本次共 " + pRecords.length + " 筆" + cohortSummary(pRecords) : "尚無紀錄";
     $("pRecords").replaceChildren();
     pRecords.forEach((r, i) => {
