@@ -457,7 +457,7 @@
   // 手指拖到畫面上緣或下緣時自動捲動，長清單也能一路勾下去
   function rangeAutoScroll() {
     if (!rangeDrag || !rangeDrag.moved) return;
-    const y = rangeDrag.lastY, edge = 70, topEdge = 130;
+    const y = rangeDrag.lastY, edge = 70, topEdge = $("tabsBar").getBoundingClientRect().bottom + 40;
     const dy = y > window.innerHeight - edge ? 14 : y < topEdge ? -14 : 0;
     if (dy) { window.scrollBy(0, dy); rangeDragUpdate(rangeDrag.lastX, rangeDrag.lastY); }
     requestAnimationFrame(rangeAutoScroll);
@@ -527,7 +527,7 @@
     if (!row || row.hidden || !rangeApi[prefix].get(row)) return fallback();
     const rect = row.getBoundingClientRect(), wrap = row.closest(".tablewrap").getBoundingClientRect();
     const check = row.querySelector("td.cell-select").getBoundingClientRect();
-    const barHeight = bar.offsetHeight || 52, cohortBar = $("cohortBar").getBoundingClientRect().bottom;
+    const barHeight = bar.offsetHeight || 52, cohortBar = Math.max($("cohortBar").getBoundingClientRect().bottom, $("tabsBar").getBoundingClientRect().bottom);
     // 那一筆不在畫面內（或下方空間不夠）時，固定在畫面底部
     if (rect.bottom < cohortBar || rect.bottom + barHeight + 8 > window.innerHeight) return fallback();
     const left = Math.max(check.right, wrap.left + 40);
@@ -576,7 +576,21 @@
     else if (settings.tab === "reward") { rSelectedRows.clear(); rRender(); }
   });
 
+  /* 頁籤懸浮：期別列高度會變（手機上可能折成兩行），頁籤要接在它正下方 */
+  function syncStickyBars() {
+    const cohort = $("cohortBar"), tabs = $("tabsBar");
+    if (!cohort || !tabs || $("app").hidden) return;
+    const ch = cohort.offsetHeight, root = document.documentElement.style;
+    root.setProperty("--cohort-h", ch + "px");
+    root.setProperty("--sticky-h", (ch + tabs.offsetHeight - 10) + "px");
+    tabs.classList.toggle("stuck", tabs.getBoundingClientRect().top <= ch - 10 + 0.5 && window.scrollY > 0);
+  }
+  window.addEventListener("scroll", syncStickyBars, {passive: true});
+  window.addEventListener("resize", syncStickyBars);
+  if (window.ResizeObserver) new ResizeObserver(syncStickyBars).observe($("cohortBar"));
+
   function showTab(tab) {
+    requestAnimationFrame(syncStickyBars);
     ["dorm", "points", "reward", "settings", "backup"].forEach(name => {
       $("tab-" + name).hidden = name !== tab;
       $("tabBtn-" + name).setAttribute("aria-selected", String(name === tab));
