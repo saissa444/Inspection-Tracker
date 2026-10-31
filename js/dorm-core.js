@@ -97,7 +97,8 @@
       notes.push(n.trim()); return d + MARK + String.fromCharCode(0xE100 + notes.length - 1);
     });
     // 項目名稱和號碼連在一起時切開：底層櫃下不潔446041、窗溝不潔育五7、6-2整潔
-    if (m === "p") line = line.replace(/([^\d\s、,，;；:：])(?=\d)/g, "$1 ");
+    // 「6-1」是寢室號碼，不從「-」切開（否則 1 會被當成女生隊號 001）
+    if (m === "p") line = line.replace(/([^\d\s、,，;；:：\-－]|(?<!\d)[\-－])(?=\d)/g, "$1 ");
     else line = line.replace(new RegExp("([^\\s、,，;；:：])(?=[" + BUILDINGS + "][一二三四五六七八九十\\d])", "g"), "$1 ").replace(/([^\d\s、,，;；:：育一二三四五六七八九十\-－])(?=\d{1,2}[-－]\d)/g, "$1 ");
     const toks = line.split(/[\s、,，;；:：。．.!！?？~～]+/).filter(Boolean);
     const split = t => { const j = t.indexOf(MARK); return j < 0 ? [t, ""] : [t.slice(0, j), notes[t.charCodeAt(j + 1) - 0xE100] || ""]; };
@@ -133,12 +134,15 @@
       if (!date && !items.length) { const d = parseDate(line.replace(/^[^\d一-鿿]+/, ""), now); if (d) { date = d; pending = null; continue; } }
       // 標題詞和結尾提醒直接略過
       if (/^[（(【\[]?(更正|修正|更新|更新版|內務檢查|內務查察|大掃除|大掃除缺失|大掃除檢查)[）)】\]]?$/.test(line) || /疑義|向我反|告知本人/.test(line)) { cont = null; continue; }
-      const sw = line.match(/^(公物|公區|公共區域|公共)\s*[:：]?\s*(.*)$/);
+      // 前面可以有編號：五、公區不潔：6-1、(六)公區優 6-7
+      const sw = line.match(/^((?:[一二三四五六七八九十]+\s*[、.．]|\d{1,2}\s*[、.．]|[（(][一二三四五六七八九十\d]{1,3}[）)])?\s*)(公物|公區|公共區域|公共)(\s*[:：]?\s*)(.*)$/);
       let lm = mode, P;
       if (sw) {
-        const rest = sw[2];
+        const rest = sw[4];
         if (!rest) { dropPending(); mode = "g"; continue; }
-        const pg = prepLine(rest, "g"), pp = prepLine(line, "p");
+        // 「五、公區不潔：6-1」：前面有編號時整行一起解析（項目顯示成「五 公區不潔」）
+        const whole = !!sw[1];
+        const pg = prepLine(whole ? line : rest, "g"), pp = prepLine(line, "p");
         // 「公區置物 176 153」是個人項目：後面接個人號碼就不切換到公區
         if (!hasT(pg, "g") && hasT(pp, "p")) { lm = "p"; P = pp; }
         else { dropPending(); mode = "g"; lm = "g"; P = pg; }
