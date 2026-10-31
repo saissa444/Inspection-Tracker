@@ -120,6 +120,8 @@
       // 全形數字轉半形，去掉看不見的字元
       line = line.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
         .replace(/[​-‍⁠﻿]/g, "").replace(/　/g, " ").trim();
+      // 圖片辨識留下的空括號：床鋪整潔( )、床鋪不潔(。)
+      line = line.replace(/\s*[（(][\s。.．，,、·・°'"`]*[）)]/g, "").trim();
       if (!line) { cont = null; continue; }
       // 項目後面標分數或處分：床鋪整潔(+0.2)：、枕頭有毛髮(-0.2)：、抽風扇不潔(寢室記大X)：
       let mkSign = null, mkRoom = false;
@@ -167,7 +169,8 @@
         if (j > 0) { leadBad = toks.slice(j, i).map(t => split(t)[0]); item = toks.slice(0, j).join(" "); }
         else item = toks.slice(0, i).join(" ");
       }
-      else if (i === 0 && pending && pending.mode === lm) { item = pending.text; pending.used = true; if (pending.sign !== null) mkSign = pending.sign; }
+      // 項目名稱單獨一行、下一行才是號碼：名稱那行還不知道是個人還是公區，所以下一行是寢室時也接上去
+      else if (i === 0 && pending) { item = pending.text; pending.used = true; if (pending.sign !== null) mkSign = pending.sign; }
       // 上一行的號碼太長換行：整行只有號碼（沒有括號說明），接到上一個項目
       // （打錯的號碼，例如多一碼，也留在這個項目裡標成「看不懂」）
       else if (i === 0 && cont && cont.scope === lm && toks.every(t => { const [n, note] = split(t); return !note && (isT(n) || numish(n)); })) {
