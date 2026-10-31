@@ -140,6 +140,9 @@
           }
           // 「育五3」「育六10」這類位置名稱是註記文字，不可拆成「育五」＋女生隊號 3
           if (/^育[一二三四五六七八九十]+\d{1,2}$/.test(normalized)) { pending.push(word); continue; }
+          // 號碼後面直接接文字（457248床上放置手機）：文字就是這位同學的事由，等於「床上放置手機 457248」
+          const lead = normalized.match(/^(\d{3}|\d{6}|\d{10})([\u4e00-\u9fff][^:：]*)$/);
+          if (lead) { emit(lead[1], lead[2]); continue; }
           const colon = Math.max(word.lastIndexOf(":"), word.lastIndexOf("："));
           if (colon >= 0 && colon < word.length - 1) {
             emit(word.slice(colon + 1), word.slice(0, colon));
