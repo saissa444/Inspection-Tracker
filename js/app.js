@@ -847,26 +847,40 @@
   function renderCheck(panel, value, mode) {
     panel.replaceChildren();
     const cohort = activeCohort();
-    if (!core.clean(value)) { panel.textContent = "尚未輸入學生資料"; return null; }
+    if (!core.clean(value)) { panel.textContent = "尚未輸入學生資料"; delete panel.dataset.okOpen; delete panel.dataset.badOpen; return null; }   // 下一批重新從預設（成功的收起）開始
     if (!cohort) { panel.textContent = "請先到「名冊」匯入名冊。"; panel.classList.add("err"); return null; }
     panel.classList.remove("err");
     try {
       const resolved = core.resolveStudents(value, cohort.students, otherCohorts());
-      resolved.matches.forEach(({student, count, notes}) => {
+      // 有問題的（無法辨識、重複輸入）放上面並展開；辨識成功的收在一起，預設收起
+      const studentRow = ({student, count, notes}) => {
         const row = document.createElement("div");
         row.className = "student-row" + (count > 1 ? " error" : "");
         const dupText = mode === "points" ? "｜本批輸入 " + count + " 次，只新增 1 筆" : "｜本批共 " + count + " 筆（重複 " + (count - 1) + " 次，全部新增）";
         row.textContent = student.name + (count > 1 ? dupText : "｜辨識成功") +
           "\n女生隊號：" + (student.female || "—") + "　建制隊號：" + (student.team || "—") + "　學籍號碼：" + student.school +
           (notes.length ? "\n註記：" + notes.join("、") : "");
-        panel.appendChild(row);
-      });
-      resolved.errors.forEach(error => {
+        return row;
+      };
+      const group = (cls, title, rows, open, key) => {
+        if (!rows.length) return;
+        const box = document.createElement("details"); box.className = "check-group " + cls;
+        // 打字時面板會一直重畫：記住使用者自己打開或收起的狀態
+        const saved = panel.dataset[key];
+        box.open = saved === undefined ? open : saved === "1";
+        const sum = document.createElement("summary"); sum.textContent = title; box.append(sum, ...rows);
+        box.addEventListener("toggle", () => { panel.dataset[key] = box.open ? "1" : "0"; });
+        panel.appendChild(box);
+      };
+      const dups = resolved.matches.filter(m => m.count > 1), oks = resolved.matches.filter(m => m.count === 1);
+      const errRows = resolved.errors.map(error => {
         const row = document.createElement("div");
         row.className = "student-row error";
         row.textContent = error.token + "：" + error.message;
-        panel.appendChild(row);
+        return row;
       });
+      group("check-bad", "需要確認（" + (errRows.length + dups.length) + "）", errRows.concat(dups.map(studentRow)), true, "badOpen");
+      group("check-ok", "辨識成功 " + oks.length + " 位（點開查看）", oks.map(studentRow), false, "okOpen");
       const summary = document.createElement("p");
       summary.className = "summary-line";
       summary.textContent = "【" + cohort.label + "】輸入 " + resolved.tokens.length + " 次；辨識 " + resolved.matches.length + " 位；重複 " +

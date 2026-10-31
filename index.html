@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>學生加扣分・獎懲登錄</title>
-<link rel="manifest" href="./manifest.webmanifest?v=20261031b">
+<link rel="manifest" href="./manifest.webmanifest?v=20261031c">
 <meta name="theme-color" content="#526a85">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="加扣分獎懲">
-<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261031b">
+<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261031c">
 <style>
 :root{--ink:#3b3a37;--muted:#6e6862;--line:#e4ded5;--bg:#f1eee9;--card:#fff;--brand:#526a85;--brand-2:#5d7893;--soft:#edf0f3;--err:#9c5454;--ok:#557357;--warn:#8a6538;--cohort:#526a85;font-family:system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;color:var(--ink);background:var(--bg)}
 *{box-sizing:border-box}
@@ -83,6 +83,13 @@ input[type="checkbox"]{width:22px;height:22px;padding:0;vertical-align:middle;ac
 .student-row{padding:7px 0;border-bottom:1px solid var(--line);white-space:pre-wrap;overflow-wrap:anywhere}
 .student-row:last-of-type{border-bottom:0}
 .student-row.error{color:var(--err)}
+/* 辨識結果：有問題的展開在上面，辨識成功的預設收起 */
+.check-group{margin:4px 0 0;border-top:1px solid var(--line)}
+.check-group summary{cursor:pointer;font-weight:650;padding:6px 0;list-style-position:inside}
+.check-group.check-bad summary{color:var(--err)}
+.check-group.check-ok summary{color:var(--ok)}
+.check-group .student-row:last-child{border-bottom:0}
+#pAdd{margin-top:4px}
 
 /* 加扣分：常用與瀏覽 */
 .reason-browser{margin:12px 0;border:1px solid #d3d9df;border-radius:12px;padding:12px;background:#f8f7f4}
@@ -638,6 +645,8 @@ dialog::backdrop{background:rgba(60,52,44,.4);backdrop-filter:blur(3px);-webkit-
         <select id="pScore" hidden aria-hidden="true" tabindex="-1"></select>
       </div>
       <div class="reason-favorites"><div class="fav-head"><h3>常用分類</h3><span id="pFavoriteHint" class="note"></span></div><div id="pFavorites" role="group" aria-label="常用分類"></div></div>
+      <button id="pAdd" type="button">批次新增紀錄</button>
+      <p id="pError" class="err" role="status"></p>
       <label for="pCategory">加減分依據（歸類）</label><select id="pCategory"></select>
       <label for="pItem">事蹟說明</label><select id="pItem"></select>
       <details class="reason-browser" id="pBrowser">
@@ -648,8 +657,6 @@ dialog::backdrop{background:rgba(60,52,44,.4);backdrop-filter:blur(3px);-webkit-
         <p id="pResultCount" class="note" role="status" aria-live="polite"></p>
         <div id="pResults" class="reason-results" role="group" aria-label="全分類事蹟說明"></div>
       </details>
-      <p id="pError" class="err" role="status"></p>
-      <button id="pAdd" type="button">批次新增紀錄</button>
     </section>
 
     <section>
@@ -845,12 +852,12 @@ dialog::backdrop{background:rgba(60,52,44,.4);backdrop-filter:blur(3px);-webkit-
 })();
 </script>
 <script defer src="./vendor/xlsx.full.min.js?v=0.20.3"></script>
-<script defer src="./js/core.js?v=20261031b"></script>
-<script defer src="./js/store.js?v=20261031b"></script>
-<script defer src="./js/dorm-core.js?v=20261031b"></script>
-<script defer src="./js/ocr.js?v=20261031b"></script>
-<script defer src="./js/dorm.js?v=20261031b"></script>
-<script defer src="./js/app.js?v=20261031b"></script>
+<script defer src="./js/core.js?v=20261031c"></script>
+<script defer src="./js/store.js?v=20261031c"></script>
+<script defer src="./js/dorm-core.js?v=20261031c"></script>
+<script defer src="./js/ocr.js?v=20261031c"></script>
+<script defer src="./js/dorm.js?v=20261031c"></script>
+<script defer src="./js/app.js?v=20261031c"></script>
 <script>if ("serviceWorker" in navigator && location.protocol === "https:") window.addEventListener("load", function () { navigator.serviceWorker.register("./sw.js").catch(function () {}); });</script>
 </body>
 </html>
