@@ -156,6 +156,16 @@
         else if (lm === "p" && !hasT(P, "p")) { const pg = prepLine(line, "g"); if (hasT(pg, "g")) { lm = "g"; P = pg; } }
       }
       const {toks, split} = P, isT = isTof(lm);
+      // 「樂五3寢、5寢、6寢」：後面只寫寢號的，沿用前一間的棟別和樓層（樂五5寢、樂五6寢）
+      if (lm === "g") {
+        let base = null;
+        toks.forEach((t, k) => {
+          const n = split(t)[0], key = roomOf(n);
+          if (key) { base = (/^\d/.test(key) ? "育" : "") + key.replace(/\d+$/, ""); return; }
+          const m = base && /^(\d{1,2})[寢室]?$/.exec(n);
+          if (m && roomOf(base + m[1])) toks[k] = base + m[1] + t.slice(n.length);
+        });
+      }
       let i = toks.findIndex(t => isT(split(t)[0]));
       // 開頭幾個是「號碼但對不上」（打錯、辨識錯，例如 47041、45l183）：不能當成項目名稱，當成看不懂的號碼
       const numish = t => /^[\dOoIl|]{3,9}$/.test(t) && (t.match(/\d/g) || []).length >= t.length - 1;
