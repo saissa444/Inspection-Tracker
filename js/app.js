@@ -584,7 +584,14 @@
     root.setProperty("--cohort-h", ch + "px");
     root.setProperty("--sticky-h", (ch + tabs.offsetHeight - 10) + "px");
     tabs.classList.toggle("stuck", tabs.getBoundingClientRect().top <= ch - 10 + 0.5 && window.scrollY > 0);
+    // 內務的功能列（登錄公告｜檢查紀錄…）接在主頁籤下面一起懸浮
+    const sub = $("tab-dorm").hidden ? null : document.querySelector("#tab-dorm .d-subtabs");
+    const subStuck = !!sub && window.scrollY > 0 && sub.getBoundingClientRect().top <= ch - 10 + tabs.offsetHeight + 0.5;
+    if (sub) sub.classList.toggle("stuck", subStuck);
+    tabs.classList.toggle("sub-stuck", subStuck);
+    root.setProperty("--sub-h", (sub ? sub.offsetHeight - 6 : 0) + "px");
   }
+  window.syncStickyBars = syncStickyBars;
   window.addEventListener("scroll", syncStickyBars, {passive: true});
   window.addEventListener("resize", syncStickyBars);
   if (window.ResizeObserver) new ResizeObserver(syncStickyBars).observe($("cohortBar"));

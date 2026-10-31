@@ -1,8 +1,8 @@
 /* 離線快取：只快取程式檔案。學生資料存在 IndexedDB（加密），不經過這裡。 */
-const CACHE = "student-records-v20261031l";
+const CACHE = "student-records-v20261031m";
 const APP = ["./", "./index.html", "./manifest.webmanifest", "./vendor/xlsx.full.min.js?v=0.20.3",
-  "./js/core.js?v=20261031l", "./js/store.js?v=20261031l", "./js/dorm-core.js?v=20261031l", "./js/ocr.js?v=20261031l", "./js/dorm.js?v=20261031l", "./js/app.js?v=20261031l",
-  "./icons/icon-192.png?v=20261031l", "./icons/icon-512.png?v=20261031l", "./icons/icon-180.png?v=20261031l"];
+  "./js/core.js?v=20261031m", "./js/store.js?v=20261031m", "./js/dorm-core.js?v=20261031m", "./js/ocr.js?v=20261031m", "./js/dorm.js?v=20261031m", "./js/app.js?v=20261031m",
+  "./icons/icon-192.png?v=20261031m", "./icons/icon-512.png?v=20261031m", "./icons/icon-180.png?v=20261031m"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(APP)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => {
   e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith("student-records-") && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));

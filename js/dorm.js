@@ -1052,7 +1052,18 @@
     window.addEventListener("resize", syncHlBox);
     root.addEventListener("click", async e => {
       const t = e.target;
-      const sb = t.closest("[data-sub]"); if (sb) { showSub(sb.dataset.sub); return; }
+      const sb = t.closest("[data-sub]"); if (sb) {
+        // 功能列懸浮中切換：捲到新頁面的開頭（功能列留在原位），不要停在舊頁面的捲動位置
+        const nav = sb.closest(".d-subtabs"), stuck = nav && nav.classList.contains("stuck");
+        showSub(sb.dataset.sub);
+        if (stuck) {
+          const top = parseFloat(getComputedStyle(nav).top) || 0;
+          const natural = $("tab-dorm").getBoundingClientRect().top + window.scrollY + (parseFloat(getComputedStyle(nav).marginTop) || 0);
+          window.scrollTo({top: Math.max(0, natural - top)});
+        }
+        if (window.syncStickyBars) requestAnimationFrame(window.syncStickyBars);
+        return;
+      }
       const jp = t.closest("[data-jump]"); if (jp) { jumpTo(jp.dataset.jump); return; }
       const pi = t.closest("[data-pickinsp]"); if (pi) { $("dInsp").value = pi.dataset.pickinsp; renderDraft(); return; }
       const f = t.closest("[data-flip]"); if (f && draft) { const it = draft.items[+f.dataset.flip]; it.sign *= -1; renderDraft(); return; }
