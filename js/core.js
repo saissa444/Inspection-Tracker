@@ -106,8 +106,10 @@
       try { parseTokens(token).forEach(token => inputs.push({token, note})); }
       catch (error) { inputs.push({token, note, error: error.message}); }
     };
+    // 「指甲過長：」這種單獨一行、以冒號結尾、沒有學生的標題，套用到下面各行的學生，直到下一個標題
+    let heading = "";
     for (const line of clean(value).split(/[\r\n]+/)) {
-      let note = "", carry = [];
+      let note = "", carry = [], lineHasStudent = false;
       for (const group of line.split(/[,，、;；]+/)) {
         let pending = [], emitted = false;
         const emit = (token, prefix) => {
@@ -117,8 +119,8 @@
             note = carry.concat(own ? [own] : []).join("、");
             carry = [];
           }
-          pending = []; emitted = true;
-          add(token, note);
+          pending = []; emitted = true; lineHasStudent = true;
+          add(token, note || heading);
         };
         for (const word of group.split(/\s+/).filter(Boolean)) {
           const normalized = word.normalize("NFKC");
@@ -143,6 +145,10 @@
         }
         // 段落結尾還沒接學生的文字先暫存，看同一行後面有沒有學生；整行結束仍沒有才回報
         if (pending.length) carry.push(clean(pending.join(" ")));
+      }
+      if (!lineHasStudent && carry.length && /[:：]\s*$/.test(carry[carry.length - 1])) {
+        heading = carry.join("、").replace(/[:：]+\s*$/, "").trim();
+        continue;
       }
       carry.forEach(token => add(token, ""));
     }
