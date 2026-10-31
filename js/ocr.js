@@ -75,6 +75,8 @@
       // 隊號裡被認成英文字母的數字：O→0、l／I／|→1、S→5、B→8（只改 5～8 碼、至少 4 個數字的字串）
       .replace(/(?<![A-Za-z\d])[\dOoIl|SB]{5,8}(?![A-Za-z\d])/g, t => (t.match(/\d/g) || []).length >= 4 ? t.replace(/[Oo]/g, "0").replace(/[Il|]/g, "1").replace(/S/g, "5").replace(/B/g, "8") : t)
       .replace(/([育樂][一二三四五六七八九十])(\d{1,2})(?![\d寢室])[^\s\d、,，:：;；()（）]/g, "$1$2寢")
+      // 括號裡只有空白或標點（床鋪整潔( )、床鋪不潔(。)）：整個拿掉
+      .replace(/[ \t]*[（(][\s。.．，,、·・°'"`]*[）)]/g, "")
       .split(/\r?\n/).map(l => l.trim()).filter(Boolean).join("\n");
   }
 
