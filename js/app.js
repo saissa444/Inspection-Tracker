@@ -901,6 +901,29 @@
   const reasonKey = text => text.normalize("NFKC").replace(/^\s*\d+\s*[.、．:：)）-]?\s*/, "").replace(/[\s\p{P}]/gu, "");
 
   fillOptions($("pScore"), SCORES); $("pScore").value = "0.2";
+  // 分數改成 0.1～0.8 的圓角鍵：點一下選定這一批的分數（值仍存在隱藏的 #pScore）
+  function syncScoreBtns() {
+    $("pScoreBtns").querySelectorAll(".score-btn").forEach(b => {
+      const on = b.dataset.score === $("pScore").value;
+      b.setAttribute("aria-checked", String(on)); b.tabIndex = on ? 0 : -1;
+    });
+  }
+  SCORES.forEach(v => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "score-btn"; b.dataset.score = v; b.textContent = v;
+    b.setAttribute("role", "radio"); b.setAttribute("aria-label", v + " 分");
+    b.addEventListener("click", () => { $("pScore").value = v; $("pScore").dispatchEvent(new Event("change", {bubbles: true})); syncScoreBtns(); });
+    $("pScoreBtns").append(b);
+  });
+  // 鍵盤左右鍵也可以換分數
+  $("pScoreBtns").addEventListener("keydown", event => {
+    const i = SCORES.indexOf($("pScore").value), d = {ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1}[event.key];
+    if (!d) return;
+    event.preventDefault();
+    const v = SCORES[Math.min(SCORES.length - 1, Math.max(0, i + d))];
+    $("pScore").value = v; syncScoreBtns(); $("pScoreBtns").querySelector('[data-score="' + v + '"]').focus();
+  });
+  syncScoreBtns();
 
   function pCheckStudents() { renderCheck($("pCheck"), $("pIds").value, "points"); }
   function pUpdateAddState() { $("pAdd").disabled = false; }
@@ -910,6 +933,7 @@
     const plus = $("pKind").value === "加分", b = $("pKindToggle");
     b.textContent = plus ? "加分" : "扣分";
     b.classList.toggle("plus", plus); b.classList.toggle("minus", !plus);
+    $("pScoreBtns").classList.toggle("plus", plus); $("pScoreBtns").classList.toggle("minus", !plus);
     b.setAttribute("aria-label", "加扣分類型：" + (plus ? "加分" : "扣分") + "（點一下切換成" + (plus ? "扣分" : "加分") + "）");
   }
   $("pKindToggle").addEventListener("click", () => {

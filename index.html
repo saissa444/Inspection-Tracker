@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>學生加扣分・獎懲登錄</title>
-<link rel="manifest" href="./manifest.webmanifest?v=20261031a">
+<link rel="manifest" href="./manifest.webmanifest?v=20261031b">
 <meta name="theme-color" content="#526a85">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="加扣分獎懲">
-<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261031a">
+<link rel="apple-touch-icon" href="./icons/icon-180.png?v=20261031b">
 <style>
 :root{--ink:#3b3a37;--muted:#6e6862;--line:#e4ded5;--bg:#f1eee9;--card:#fff;--brand:#526a85;--brand-2:#5d7893;--soft:#edf0f3;--err:#9c5454;--ok:#557357;--warn:#8a6538;--cohort:#526a85;font-family:system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;color:var(--ink);background:var(--bg)}
 *{box-sizing:border-box}
@@ -112,6 +112,17 @@ input[type="checkbox"]{width:22px;height:22px;padding:0;vertical-align:middle;ac
 .kind-toggle.minus{color:var(--err);background:#f8eeee}
 .kind-toggle::after{content:" ⇄";font-size:13px;font-weight:600;opacity:.65;letter-spacing:0}
 .kind-tip{margin:4px 0 8px;font-size:12.5px}
+/* 分數：0.1～0.8 圓角鍵，點一下選定；顏色跟著加扣分類型（綠＝加分、紅＝扣分） */
+.score-field{margin:6px 0 4px}
+.field-label{display:block;font-weight:650;margin:13px 0 6px}
+.score-btns{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;--sc:var(--ok);--sc-bg:#eef5ec}
+.score-btns.minus{--sc:var(--err);--sc-bg:#f8eeee}
+.score-btn{margin:0;min-height:42px;padding:0 2px;border-radius:999px;border:2px solid var(--sc);background:#fff;color:var(--sc);font-size:16px;font-weight:700;box-shadow:none;transition:background-color .15s ease,color .15s ease}
+.score-btn:hover{background:var(--sc-bg)}
+.score-btn[aria-checked="true"]{background:var(--sc);color:#fff}
+.score-btns{max-width:720px}
+@media (max-width:420px){ .score-btns{gap:4px} .score-btn{font-size:15px;min-height:40px} }
+@media (max-width:360px){ .score-btns{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px} }
 /* 預覽清單：點欄位直接編輯 */
 #pRecords td.editable{cursor:pointer}
 #pRecords td.editable:hover{background:rgba(82,106,133,.07);box-shadow:inset 0 -1px 0 rgba(82,106,133,.35)}
@@ -621,8 +632,10 @@ dialog::backdrop{background:rgba(60,52,44,.4);backdrop-filter:blur(3px);-webkit-
           <select id="pKind" hidden aria-hidden="true" tabindex="-1"><option>加分</option><option>扣分</option></select></div>
       </div>
       <p id="pKindTip" class="note kind-tip">點「加分／扣分」可以切換這一批是加分還是扣分。</p>
-      <div class="grid">
-        <div><label for="pScore">分數（0.1 至 0.8，每次 0.1 分）</label><select id="pScore"></select></div>
+      <div class="score-field">
+        <span class="field-label" id="pScoreLabel">分數</span>
+        <div id="pScoreBtns" class="score-btns plus" role="radiogroup" aria-labelledby="pScoreLabel"></div>
+        <select id="pScore" hidden aria-hidden="true" tabindex="-1"></select>
       </div>
       <div class="reason-favorites"><div class="fav-head"><h3>常用分類</h3><span id="pFavoriteHint" class="note"></span></div><div id="pFavorites" role="group" aria-label="常用分類"></div></div>
       <label for="pCategory">加減分依據（歸類）</label><select id="pCategory"></select>
@@ -832,12 +845,12 @@ dialog::backdrop{background:rgba(60,52,44,.4);backdrop-filter:blur(3px);-webkit-
 })();
 </script>
 <script defer src="./vendor/xlsx.full.min.js?v=0.20.3"></script>
-<script defer src="./js/core.js?v=20261031a"></script>
-<script defer src="./js/store.js?v=20261031a"></script>
-<script defer src="./js/dorm-core.js?v=20261031a"></script>
-<script defer src="./js/ocr.js?v=20261031a"></script>
-<script defer src="./js/dorm.js?v=20261031a"></script>
-<script defer src="./js/app.js?v=20261031a"></script>
+<script defer src="./js/core.js?v=20261031b"></script>
+<script defer src="./js/store.js?v=20261031b"></script>
+<script defer src="./js/dorm-core.js?v=20261031b"></script>
+<script defer src="./js/ocr.js?v=20261031b"></script>
+<script defer src="./js/dorm.js?v=20261031b"></script>
+<script defer src="./js/app.js?v=20261031b"></script>
 <script>if ("serviceWorker" in navigator && location.protocol === "https:") window.addEventListener("load", function () { navigator.serviceWorker.register("./sw.js").catch(function () {}); });</script>
 </body>
 </html>
