@@ -905,7 +905,19 @@
   function pCheckStudents() { renderCheck($("pCheck"), $("pIds").value, "points"); }
   function pUpdateAddState() { $("pAdd").disabled = false; }
 
+  // 加扣分類型：畫面上是一個切換鍵（綠字加分／紅字扣分），值仍存在隱藏的 #pKind
+  function syncKindToggle() {
+    const plus = $("pKind").value === "加分", b = $("pKindToggle");
+    b.textContent = plus ? "加分" : "扣分";
+    b.classList.toggle("plus", plus); b.classList.toggle("minus", !plus);
+    b.setAttribute("aria-label", "加扣分類型：" + (plus ? "加分" : "扣分") + "（點一下切換成" + (plus ? "扣分" : "加分") + "）");
+  }
+  $("pKindToggle").addEventListener("click", () => {
+    $("pKind").value = $("pKind").value === "加分" ? "扣分" : "加分";
+    $("pKind").dispatchEvent(new Event("change", {bubbles: true}));
+  });
   function pRenderCategories() {
+    syncKindToggle();
     const prefix = core.kindPrefix($("pKind").value);
     fillOptions($("pCategory"), Object.keys(pOptions()).filter(k => k.startsWith(prefix)));
     pRenderItems();
@@ -935,6 +947,7 @@
       button.addEventListener("click", () => {
         category.value = cat;
         pRenderItems(); item.value = reason; pRenderReasonBrowser(false);
+        if (target === "Results") $("pBrowser").open = false;   // 選好就收起，不佔版面
         const pressed = $(prefix + target).querySelector('[aria-pressed="true"]');
         if (pressed) pressed.focus({preventScroll: true});
       });
@@ -952,11 +965,11 @@
         button.append(note); favorites.append(button);
       } else matches.forEach(({cat, reason}) => {
         const button = makeChoice(cat, reason, "Favorites"), note = document.createElement("small");
-        note.textContent = cat; button.append(note); favorites.append(button);
+        note.textContent = cat; button.append(note); button.title = cat + "：" + reason; favorites.append(button);
       });
     });
     $(prefix + "FavoriteHint").textContent = !pTpl ? "匯入加扣分範本後，即可點選常用項目。" :
-      kind + "常用項目，點選即帶入歸類與事蹟。" + (missing ? " 灰色項目表示範本中未找到相符內容。" : "");
+      "點選即帶入歸類與事蹟" + (missing ? "；灰色表示範本中沒有這一項" : "");
     categories.forEach(([cat, items]) => {
       const matches = items.filter(reason => words.every(word => (cat + " " + reason).toLocaleLowerCase().includes(word)));
       if (!matches.length) return;
@@ -1386,6 +1399,7 @@
       pRecords.push(...result.records);
       pRenderRecords(); saveDrafts();
       pReasonTouched = false; pAutoApplied = false; $("pQuickHint").textContent = ""; // 下一批重新判斷是否自動帶入事由
+      $("pBrowser").open = false;
       out.style.color = "var(--ok)";
       out.textContent = "已新增 " + result.records.length + " 筆紀錄（" + activeCohort().label + "）" +
         (result.warnings.length ? "；以下輸入未新增或已合併：\n" + result.warnings.join("\n") : "。");
@@ -1533,7 +1547,7 @@
     pInline = null;
     if (rerender) pRenderRecords();
   }
-  function pStartInline(r) {
+  function pStartInline(r, focusField) {
     if (!pTpl) { alert("請先到「名冊」匯入加扣分範本才能編輯。"); return; }
     if (pInline) pCancelInline();
     const targets = pSelected.size > 1 && pSelected.has(r) ? pRecords.filter(x => pSelected.has(x)) : [r];
@@ -1600,8 +1614,24 @@
       if (event.key === "Escape") { event.preventDefault(); pCancelInline(); }
       if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); save.click(); }
     });
-    if (autoFocusOK()) detail.focus(); // 手機不自動選中，避免一進編輯就跳出鍵盤
+    const fields = {detail, kind, score, reason};
+    if (focusField && fields[focusField]) {
+      // 點哪一格就直接選中那一格；電腦上下拉選單直接展開
+      const el = fields[focusField];
+      el.focus({preventScroll: true});
+      if (el.tagName === "SELECT" && autoFocusOK() && el.showPicker) { try { el.showPicker(); } catch (error) { /* 不支援就只選中 */ } }
+      if (el.tagName === "TEXTAREA") { try { el.setSelectionRange(el.value.length, el.value.length); } catch (error) { /* 略過 */ } }
+    } else if (autoFocusOK()) detail.focus(); // 手機不自動選中，避免一進編輯就跳出鍵盤
   }
+  // 點預覽列的欄位（或手機卡片上的分數、事由、說明）直接進入編輯
+  $("pRecords").addEventListener("click", event => {
+    const hit = event.target.closest("[data-edit-field]");
+    if (!hit || event.target.closest("input, select, textarea, button")) return;
+    const tr = hit.closest("tr[data-index]"), r = tr && pRecords[Number(tr.dataset.index)];
+    if (!r || tr.classList.contains("inline-editing")) return;
+    event.stopPropagation(); event.preventDefault();
+    pStartInline(r, hit.dataset.editField);
+  }, true);   // 先攔下來，不讓手機卡片把這一下當成「展開／收合」
   /** 複製：在原紀錄正下方插入一筆完全相同的紀錄（以已儲存的內容為準；編輯中未儲存的修改會放棄） */
   function pCopyInline() {
     if (!pInline) return;
@@ -1693,6 +1723,13 @@
     };
     td.append(line1, subLine("事由", r.reason));
     if (prefix === "p" && r.detail) td.append(subLine("說明", r.detail));
+    if (prefix === "p") {
+      // 手機卡片：點「扣 0.2」改分數、點事由那行改事由、點說明那行改說明；點姓名或箭頭仍是展開
+      amt.classList.add("editable"); amt.dataset.editField = "score"; amt.title = "點一下直接編輯分數";
+      const lines = td.querySelectorAll(".sum-line2");
+      lines[0].classList.add("editable"); lines[0].dataset.editField = "reason";
+      if (lines[1]) { lines[1].classList.add("editable"); lines[1].dataset.editField = "detail"; }
+    }
     if (prefix === "r" && r.adjustReason) td.append(subLine("加重減輕", r.adjustReason + (r.adjustAmount ? " " + r.adjustAmount : "")));
     if (expanded[prefix].has(r)) tr.classList.add("expanded");
     const toggle = () => {
@@ -1802,7 +1839,11 @@
       tr.append(summaryCell("p", r, tr));
       const cohortCell = document.createElement("td"); cohortCell.className = "cell-cohort"; cohortCell.append(cohortTag(r.cohort)); tr.append(cohortCell);
       [["女生隊號", r.female, "nowrap"], ["建制隊號", r.team, "nowrap"], ["姓名", r.name, "nowrap cell-name"], ["說明", r.detail || "", "wrap"], ["學籍號碼", r.school, "nowrap"], ["類型", r.kind, "nowrap"], ["分數", r.score.toFixed(1), "nowrap"], ["事由", r.reason, "wrap"]].forEach(([label, text, cls]) => {
-        const td = document.createElement("td"); td.className = cls; td.dataset.label = label; td.textContent = text; tr.appendChild(td);
+        const td = document.createElement("td"); td.className = cls; td.dataset.label = label; td.textContent = text;
+        // 說明、類型、分數、事由：點一下就在這一列直接編輯（有勾選多筆、且這筆也勾了，就一起改）
+        const field = {"說明": "detail", "類型": "kind", "分數": "score", "事由": "reason"}[label];
+        if (field) { td.classList.add("editable"); td.dataset.editField = field; td.title = "點一下直接編輯" + label; }
+        tr.appendChild(td);
       });
       const td = document.createElement("td"); td.className = "nowrap cell-actions";
       const edit = document.createElement("button"), del = document.createElement("button");
