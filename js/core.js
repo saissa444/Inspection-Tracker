@@ -108,8 +108,11 @@
     };
     // 「指甲過長：」這種單獨一行、以冒號結尾、沒有學生的標題，套用到下面各行的學生，直到下一個標題
     let heading = "";
-    for (const line of clean(value).split(/[\r\n]+/)) {
-      let note = "", carry = [], lineHasStudent = false;
+    for (const rawLine of clean(value).split(/[\r\n]+/)) {
+      // 號碼後面的括號是細項：120（頭髮）→ 學生 120，註記「被不整（頭髮）」。括號裡可能有頓號，先收起來再切
+      const subs = [];
+      const line = rawLine.replace(/([0-9０-９])\s*[（(]([^（）()]*)[）)]/g, (x, d, n) => { subs.push(clean(n)); return d + "\uE000" + String.fromCharCode(0xE100 + subs.length - 1); });
+      let note = "", carry = [], lineHasStudent = false, sub = "";
       for (const group of line.split(/[,，、;；]+/)) {
         let pending = [], emitted = false;
         const emit = (token, prefix) => {
@@ -120,9 +123,15 @@
             carry = [];
           }
           pending = []; emitted = true; lineHasStudent = true;
-          add(token, note || heading);
+          const base = note || heading;
+          add(token, sub ? (base ? base + "（" + sub + "）" : sub) : base);
         };
-        for (const word of group.split(/\s+/).filter(Boolean)) {
+        for (let word of group.split(/\s+/).filter(Boolean)) {
+          const bm = word.match(/\uE000([\uE100-\uE1FF])$/);
+          sub = bm ? subs[bm[1].charCodeAt(0) - 0xE100] || "" : "";
+          if (bm) word = word.slice(0, -2);
+          // 括號留在文字裡（不是接在號碼後面的）就還原
+          word = word.replace(/\uE000([\uE100-\uE1FF])/g, (x, c) => "（" + (subs[c.charCodeAt(0) - 0xE100] || "") + "）");
           const normalized = word.normalize("NFKC");
           // 完整姓名優先；不從姓名後綴猜學生。
           if (names.has(normalize(word)) || /^'?\d+(?:\.0+)?$|^\d+[-–~～]\d+$/.test(normalized)) {
@@ -150,6 +159,9 @@
         heading = carry.join("、").replace(/[:：]+\s*$/, "").trim();
         continue;
       }
+      // 沒有學生的標題、結尾提醒：「1151030內務檢查」「11509300820服儀檢查」「若有疑問請找我反應」
+      if (!lineHasStudent && (/^(\d{7}|\d{11}|\d{2,3}[\/.]\d{1,2}[\/.]\d{1,2})(?!\d)/.test(rawLine.trim()) ||
+          /^(本日|今日|今天)?\s*(\d{4}\s*)?(內務|服儀)?(檢查|查察)(名單|結果)?(如下)?[:：]?$/.test(rawLine.trim()) || /疑問|疑義|找我反|向我反/.test(rawLine))) continue;
       carry.forEach(token => add(token, ""));
     }
     return inputs;
