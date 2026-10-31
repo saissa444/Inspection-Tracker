@@ -9,6 +9,7 @@
   const CNR = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
   const P_UNIT = 2, G_UNIT = 10;   // 以 0.1 分為單位：個人 0.2、公區 1
   const MARK = "";           // 括號註記的暫存記號
+  const ITEM = "\u0001";      // 「號碼直接接文字」的項目記號
 
   /* ───── 寢室 ───── */
   // 育五7、育五-7、育五7寢、5-7、育六九（中文寢號）、育五十 → "5-7"
@@ -92,6 +93,9 @@
   /* ───── 一行切成項目和號碼；m = "p" 個人、"g" 公區 ───── */
   function prepLine(line, m) {
     const notes = [];
+    // 號碼後面直接接文字（457248床上放置手機）：文字就是這位同學的項目，等於「床上放置手機 457248」
+    // （做記號 ITEM，和括號裡的細項註記「442250（拉鍊朝外）」分開）
+    if (m === "p") line = line.replace(/(^|[\s、,，;；:：])(\d{6}|\d{3})([\u4e00-\u9fff][^\s、,，;；:：（(\d]*)(?=$|[\s、,，;；])/g, "$1$2（" + ITEM + "$3）");
     // 號碼後面的括號是細項註記：442250（拉鍊朝外）、育六九（空床位）
     line = line.replace(/([\d一二三四五六七八九十][寢室床]?)\s*[（(]([^）)]*)[）)]/g, (x, d, n) => {
       notes.push(n.trim()); return d + MARK + String.fromCharCode(0xE100 + notes.length - 1);
@@ -101,7 +105,11 @@
     if (m === "p") line = line.replace(/([^\d\s、,，;；:：\-－]|(?<!\d)[\-－])(?=\d)/g, "$1 ");
     else line = line.replace(new RegExp("([^\\s、,，;；:：])(?=[" + BUILDINGS + "][一二三四五六七八九十\\d])", "g"), "$1 ").replace(/([^\d\s、,，;；:：育一二三四五六七八九十\-－])(?=\d{1,2}[-－]\d)/g, "$1 ");
     const toks = line.split(/[\s、,，;；:：。．.!！?？~～]+/).filter(Boolean);
-    const split = t => { const j = t.indexOf(MARK); return j < 0 ? [t, ""] : [t.slice(0, j), notes[t.charCodeAt(j + 1) - 0xE100] || ""]; };
+    const split = t => {
+      const j = t.indexOf(MARK); if (j < 0) return [t, "", false];
+      const n = notes[t.charCodeAt(j + 1) - 0xE100] || "";
+      return n.startsWith(ITEM) ? [t.slice(0, j), n.slice(ITEM.length), true] : [t.slice(0, j), n, false];
+    };
     return {toks, split};
   }
 
@@ -134,8 +142,10 @@
       const signFor = it => mkSign !== null ? mkSign : signOf(it);
       // 開頭的表情符號或符號（📢、【】）不影響日期判讀
       if (!date && !items.length) { const d = parseDate(line.replace(/^[^\d一-鿿]+/, ""), now); if (d) { date = d; pending = null; continue; } }
+      // 「本日 1430內務查察結果如下」「今日內務檢查」：日期就是今天
+      if (!date && !items.length && /^(本日|今日|今天)/.test(line) && !/\d{3,}/.test(line.replace(/^(本日|今日|今天)\s*(\d{4}(?!\d))?/, ""))) { date = todayStr(now); pending = null; continue; }
       // 標題詞和結尾提醒直接略過
-      if (/^[（(【\[]?(更正|修正|更新|更新版|內務檢查|內務查察|大掃除|大掃除缺失|大掃除檢查)[）)】\]]?$/.test(line) || /疑義|向我反|告知本人/.test(line)) { cont = null; continue; }
+      if (/^[（(【\[]?(更正|修正|更新|更新版|內務檢查|內務查察|大掃除|大掃除缺失|大掃除檢查)[）)】\]]?$/.test(line) || /疑義|疑問|向我反|找我反|告知本人/.test(line)) { cont = null; continue; }
       // 前面可以有編號：五、公區不潔：6-1、(六)公區優 6-7
       const sw = line.match(/^((?:[一二三四五六七八九十]+\s*[、.．]|\d{1,2}\s*[、.．]|[（(][一二三四五六七八九十\d]{1,3}[）)])?\s*)(公物|公區|公共區域|公共)(\s*[:：]?\s*)(.*)$/);
       let lm = mode, P;
@@ -180,7 +190,8 @@
         else item = toks.slice(0, i).join(" ");
       }
       // 項目名稱單獨一行、下一行才是號碼：名稱那行還不知道是個人還是公區，所以下一行是寢室時也接上去
-      else if (i === 0 && pending) { item = pending.text; pending.used = true; if (pending.sign !== null) mkSign = pending.sign; }
+      // 「被劣」標題下一行一行「457248床上放置手機」：每行的文字就是項目，標題不另外成一項
+      else if (i === 0 && pending && !toks.some(t => split(t)[2])) { item = pending.text; pending.used = true; if (pending.sign !== null) mkSign = pending.sign; }
       // 上一行的號碼太長換行：整行只有號碼（沒有括號說明），接到上一個項目
       // （打錯的號碼，例如多一碼，也留在這個項目裡標成「看不懂」）
       else if (i === 0 && cont && cont.scope === lm && toks.every(t => { const [n, note] = split(t); return !note && (isT(n) || numish(n)); })) {
@@ -190,13 +201,18 @@
       }
       else if (i === 0) {
         // 只有「號碼（說明）」：用括號裡的說明當項目
+        const head = pending && pending.mode === lm ? pending : null;
+        if (head) head.used = true;
         const groups = new Map();
         for (const t of toks) {
           const [n, note] = split(t), k = isT(n); if (!k) continue;
-          const key = note || "未註明項目"; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(k);
+          const key = note || (head ? head.text : "未註明項目"); if (!groups.has(key)) groups.set(key, []); groups.get(key).push(k);
         }
+        // 項目本身看不出加分或扣分（例如「床上髮夾」）時，照標題（被劣、被優）
+        const headSign = head ? (head.sign !== null ? head.sign : signOf(head.text)) : null;
+        const sOf = it => /不|未|髒|毛髮|亂|缺|沒|破|垃圾|灰|劣/.test(it) ? -1 : /優|整潔|整齊|乾淨|良好|佳|讚/.test(it) ? 1 : (headSign !== null ? headSign : signOf(it));
         let first = true;
-        for (const [it, ts] of groups) { items.push({scope: lm, item: it, sign: signOf(it), targets: ts, bad: first ? leadBad : [], notes: {}}); first = false; }
+        for (const [it, ts] of groups) { items.push({scope: lm, item: it, sign: sOf(it), targets: ts, bad: first ? leadBad : [], notes: {}}); first = false; }
         cont = null;
         continue;
       }
